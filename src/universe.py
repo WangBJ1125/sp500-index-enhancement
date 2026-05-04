@@ -23,6 +23,7 @@ UNIVERSE_TYPE = "static_current"
 
 def _clean_yfinance_ticker(ticker: Any) -> str:
     """Convert a raw ticker value into the symbol format expected by yfinance."""
+    """For example, "BRK.B" becomes "BRK-B"."""
     return str(ticker).strip().replace(".", "-")
 
 
