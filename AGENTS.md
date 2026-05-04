@@ -30,6 +30,7 @@ The portfolio return is:
 ```math
 r_{p,t} = \sum_i w_{i,t-1} r_{i,t}
 ```
+For factor construction, the project primarily uses log returns because they are time-additive and convenient for momentum and volatility estimation. For portfolio aggregation and NAV calculation, the project uses simple returns because portfolio returns are linear in asset simple returns.
 
 The benchmark return is usually proxied by SPY:
 

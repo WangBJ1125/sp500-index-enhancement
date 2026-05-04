@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Union
 
+import numpy as np
 import pandas as pd
 
 
@@ -14,6 +15,15 @@ PandasObject = Union[pd.DataFrame, pd.Series]
 def compute_simple_returns(prices: PandasObject) -> PandasObject:
     """Compute simple period-over-period returns from prices."""
     return prices.pct_change()
+
+
+def compute_log_returns(prices: PandasObject) -> PandasObject:
+    """Compute log returns, leaving non-positive price observations as NaN."""
+    previous_prices = prices.shift(1)
+    ratio = prices / previous_prices
+    valid_prices = (prices > 0) & (previous_prices > 0)
+
+    return np.log(ratio.where(valid_prices))
 
 
 def get_month_end_rebalance_dates(trading_index: Iterable) -> pd.DatetimeIndex:

@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from src import utils
@@ -17,6 +18,38 @@ def test_compute_simple_returns_for_price_dataframe():
     assert pd.isna(returns.iloc[0, 0])
     assert round(returns.loc["2024-01-03", "AAPL"], 10) == 0.10
     assert round(returns.loc["2024-01-04", "MSFT"], 10) == 0.20
+
+
+def test_compute_log_returns_for_price_dataframe():
+    prices = pd.DataFrame(
+        {
+            "AAPL": [100.0, 110.0, 121.0],
+            "MSFT": [50.0, 45.0, 54.0],
+        },
+        index=pd.date_range("2024-01-02", periods=3),
+    )
+
+    returns = utils.compute_log_returns(prices)
+    expected = np.log(prices / prices.shift(1))
+
+    pd.testing.assert_frame_equal(returns, expected)
+
+
+def test_compute_log_returns_handles_non_positive_prices_as_nan():
+    prices = pd.DataFrame(
+        {
+            "AAA": [100.0, 0.0, 110.0],
+            "BBB": [50.0, -25.0, 55.0],
+        },
+        index=pd.date_range("2024-01-02", periods=3),
+    )
+
+    returns = utils.compute_log_returns(prices)
+
+    assert pd.isna(returns.loc["2024-01-03", "AAA"])
+    assert pd.isna(returns.loc["2024-01-04", "AAA"])
+    assert pd.isna(returns.loc["2024-01-03", "BBB"])
+    assert pd.isna(returns.loc["2024-01-04", "BBB"])
 
 
 def test_get_month_end_rebalance_dates_uses_last_available_trading_date():
