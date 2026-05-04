@@ -28,11 +28,15 @@ Implemented so far:
   - Long-only portfolio construction.
   - Turnover calculation.
   - Turnover limit scaling.
+- Minimal Version 0 daily backtester in `src/backtester.py`:
+  - Rebalance-date score lookup without same-day return use.
+  - Trade-lagged weight activation.
+  - Gross and net simple-return aggregation.
+  - One-time transaction-cost deduction on active trade dates.
 
 Not implemented yet:
 
-- Full monthly backtest loop.
-- Transaction-cost deduction in realized returns.
+- End-to-end orchestration from raw data download to final report.
 - Performance reporting and plots.
 - Factor IC diagnostics.
 - Robustness analysis.
@@ -47,7 +51,8 @@ Version 0 is a simple rule-based baseline:
 - Compute factors from historical price data only.
 - Process signals cross-sectionally by date.
 - Build a long-only portfolio around an equal-weight benchmark proxy.
-- Track turnover and later deduct transaction costs.
+- Apply rebalance weights after a configurable trade lag.
+- Track turnover and deduct transaction costs on trade activation dates.
 
 For factor construction, the project primarily uses log returns because they are time-additive and convenient for momentum and volatility estimation. For portfolio aggregation and NAV calculation, the project uses simple returns because portfolio returns are linear in asset simple returns.
 
@@ -102,3 +107,13 @@ weights = benchmark_weights + active_weights
 The benchmark proxy is equal-weight across valid tickers. Active weights are created by centering cross-sectional scores, scaling them to an active budget, and optionally applying active weight caps. Final portfolio weights are clipped to long-only, optionally capped by single-name maximum weight, and normalized to sum to one.
 
 This structure is intentionally simple for Version 0 but leaves room for Version 1 controls such as tighter active-weight constraints, turnover limits, sector neutralization, and more realistic benchmark weights.
+
+## Backtest Timing
+
+The current Version 0 backtester forms weights at rebalance date `t` from scores available at or before `t`. With the default `trade_lag_days=1`, those weights are first applied on the next trading day, so rebalance-day returns are never earned with same-day signals. Gross portfolio returns are computed from held weights and daily stock simple returns. If a held ticker has a missing return on a holding day, the backtester treats that missing return as zero; production research should filter or investigate those gaps before relying on results.
+
+Transaction costs are deducted only on the first active holding day for each rebalance. The current cost convention is:
+
+```text
+cost = 2 * (transaction_cost_bps / 10000) * turnover
+```
