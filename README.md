@@ -33,11 +33,12 @@ Implemented so far:
   - Trade-lagged weight activation.
   - Gross and net simple-return aggregation.
   - One-time transaction-cost deduction on active trade dates.
+- Reporting helpers in `src/reporting.py`:
+  - NAV, active return, drawdown, turnover, and rolling risk plots.
+  - Markdown summary report with performance, costs, turnover, and limitations.
 
 Not implemented yet:
 
-- End-to-end orchestration from raw data download to final report.
-- Performance reporting and plots.
 - Factor IC diagnostics.
 - Robustness analysis.
 
@@ -95,6 +96,14 @@ Run tests:
 ```bash
 pytest
 ```
+
+Run the Version 0 pipeline:
+
+```bash
+python main.py
+```
+
+Outputs are saved to `data/processed/`, plots are saved to `reports/figures/`, and the markdown report is saved to `reports/summary_report.md`.
 
 ## Portfolio Construction
 

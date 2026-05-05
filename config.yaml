@@ -1,0 +1,46 @@
+data:
+  start_date: "2015-01-01"
+  end_date: null
+  benchmark: "SPY"
+  universe: "current_sp500"
+  price_field: "Adj Close"
+  max_tickers: 100
+  # 100 for now, set to "null" when everthing is working
+
+backtest:
+  rebalance_frequency: "M"
+  trade_lag_days: 1
+  initial_capital: 1.0
+
+factors:
+  momentum:
+    enabled: true
+    lookback_days: 252
+    skip_days: 21
+    weight: 0.3333
+  low_volatility:
+    enabled: true
+    lookback_days: 126
+    weight: 0.3333
+  reversal:
+    enabled: true
+    lookback_days: 21
+    weight: 0.3333
+
+signal_processing:
+  winsorize_lower: 0.05
+  winsorize_upper: 0.95
+  zscore: true
+  sector_neutralize: false
+
+portfolio:
+  construction_method: "score_active_weight"
+  benchmark_weight_method: "equal_weight"
+  active_budget: 0.20
+  max_active_weight: null
+  max_weight: null
+  long_only: true
+  max_monthly_turnover: null
+
+costs:
+  transaction_cost_bps: 10
