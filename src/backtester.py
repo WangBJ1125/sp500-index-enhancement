@@ -40,6 +40,7 @@ def run_backtest(
     max_weight: Optional[float] = None,
     max_turnover: Optional[float] = None,
     trade_lag_days: int = 1,
+    benchmark_weights: Optional[pd.Series] = None,
 ) -> BacktestResult:
     """Run a monthly-style long-only index-enhancement backtest.
 
@@ -79,7 +80,10 @@ def run_backtest(
         if active_date is None:
             continue
 
-        benchmark_weights = equal_weight_benchmark(valid_scores)
+        benchmark_proxy_weights = _benchmark_weights_for_scores(
+            valid_scores,
+            benchmark_weights=benchmark_weights,
+        )
         raw_active_weights = score_to_active_weights(
             valid_scores,
             active_budget=active_budget,
@@ -89,7 +93,7 @@ def run_backtest(
             max_active_weight=max_active_weight,
         )
         target_weights = construct_long_only_portfolio(
-            benchmark_weights,
+            benchmark_proxy_weights,
             capped_active_weights,
             max_weight=max_weight,
         )
@@ -183,6 +187,27 @@ def _latest_score_row(
         return None
 
     return scores.iloc[position]
+
+
+def _benchmark_weights_for_scores(
+    valid_scores: pd.Series,
+    benchmark_weights: Optional[pd.Series],
+) -> pd.Series:
+    if benchmark_weights is None:
+        return equal_weight_benchmark(valid_scores)
+
+    aligned_weights = (
+        benchmark_weights.reindex(valid_scores.index)
+        .fillna(0.0)
+        .astype(float)
+        .clip(lower=0.0)
+    )
+    total_weight = aligned_weights.sum()
+
+    if total_weight <= 0 or pd.isna(total_weight):
+        return equal_weight_benchmark(valid_scores)
+
+    return aligned_weights / total_weight
 
 
 def _active_date_for_rebalance(

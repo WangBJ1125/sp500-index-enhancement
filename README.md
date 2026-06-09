@@ -42,6 +42,94 @@ Not implemented yet:
 - Factor IC diagnostics.
 - Robustness analysis.
 
+## Version Roadmap
+
+Current project status: the project is at Version 0.1 / early Version 0.2. The pipeline runs end to end, including universe loading, data download, factor construction, signal processing, portfolio construction, backtesting, basic performance metrics, plots, and a markdown report. Results should be interpreted cautiously because the prototype uses static current constituents, has survivorship bias, compares against SPY while constructing around an equal-weight benchmark proxy, and does not yet fully separate benchmark mismatch from factor tilt effects.
+
+### Version 0.1 - Working Baseline
+
+- Static current S&P 500 universe from Wikipedia.
+- `yfinance` adjusted close and volume data.
+- Simple and log return utilities.
+- Price-based factors:
+  - 12-1 momentum using log returns.
+  - Low-volatility score using historical log-return volatility.
+  - Short-term reversal using recent log return.
+- Cross-sectional winsorization, z-scoring, and equal-weight composite score.
+- Score-based active weights around an equal-weight benchmark proxy.
+- Long-only portfolio construction.
+- Monthly rebalancing with one-day trade lag.
+- Transaction costs.
+- Basic performance metrics.
+
+### Version 0.2 - Reporting and Robustness
+
+- NAV plot versus benchmark.
+- Cumulative active return plot.
+- Drawdown plot.
+- Turnover plot.
+- Rolling active return and rolling tracking error.
+- Markdown summary report.
+- Cost sensitivity.
+- Active budget sensitivity.
+- Factor combination sensitivity.
+- Subperiod analysis.
+
+### Version 0.3 - Benchmark Hygiene
+
+- Compare strategy versus SPY.
+- Compare strategy versus equal-weight universe benchmark.
+- Separate factor tilt alpha from universe/equal-weight effect.
+- Improve interpretation of active return.
+
+Version 0.3 benchmark hygiene showed that results based on the earlier equal-weight proxy can be heavily affected by benchmark mismatch. In other words, part of the measured active return may come from comparing an equal-weight-like portfolio to SPY, rather than from factor tilts alone.
+
+### Version 0.4 — Static Market-Cap Benchmark Proxy
+
+The project now supports `portfolio.benchmark_weight_method = "market_cap_static"`. In this mode, the portfolio is constructed as:
+
+```text
+w_i,t = b_i^static_mcap + a_i,t
+```
+
+Current market capitalizations from `yfinance` are used to approximate benchmark weights, and factor scores create active tilts around that static market-cap benchmark proxy. Active weights are capped using `max_active_weight`, currently 50 bps when the config sets `max_active_weight: 0.005`.
+
+This makes the framework conceptually closer to S&P 500 index enhancement than the earlier equal-weight proxy, because the starting portfolio resembles a capitalization-weighted index more closely than an equal-weight universe.
+
+Important limitations:
+
+- Current market caps are not point-in-time.
+- Applying current market caps historically introduces look-ahead bias.
+- Results should be interpreted as a framework demonstration, not tradable historical evidence.
+- Dual-class shares such as GOOG/GOOGL may require additional treatment.
+
+### Version 1.0 - Risk-Controlled Index Enhancement
+
+- Single-name active weight caps.
+- Max portfolio weight.
+- Turnover constraints.
+- Sector exposure reporting.
+- Optional sector neutralization using approximate sector labels.
+- More realistic index-enhancement constraints.
+
+### Version 1.5 - Factor Diagnostics
+
+- IC and Rank IC.
+- ICIR.
+- Factor correlation.
+- Quintile return spread.
+- Factor attribution.
+- Analysis of which factor contributes to active return.
+
+### Version 2.0 - Machine Learning Alpha Model
+
+- Walk-forward supervised learning.
+- Ridge / Elastic Net baseline.
+- Optional tree-based models.
+- ML score compared against simple equal-weight composite score.
+- Strict avoidance of look-ahead bias.
+- ML used only after the baseline framework is robust.
+
 ## Research Design
 
 Version 0 is a simple rule-based baseline:

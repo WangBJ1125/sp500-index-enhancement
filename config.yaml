@@ -4,7 +4,8 @@ data:
   benchmark: "SPY"
   universe: "current_sp500"
   price_field: "Adj Close"
-  max_tickers: 100
+  max_tickers: null
+  refresh_market_caps: false
   # 100 for now, set to "null" when everthing is working
 
 backtest:
@@ -35,9 +36,10 @@ signal_processing:
 
 portfolio:
   construction_method: "score_active_weight"
-  benchmark_weight_method: "equal_weight"
+  benchmark_weight_method: "market_cap_static"
+  # benchmark_weight_method:  "equal_weight"
   active_budget: 0.20
-  max_active_weight: null
+  max_active_weight: 0.005
   max_weight: null
   long_only: true
   max_monthly_turnover: null

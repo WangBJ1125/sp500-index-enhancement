@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import matplotlib
 import pandas as pd
@@ -12,6 +12,17 @@ import pandas as pd
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+
+def compute_nav(returns: pd.Series) -> pd.Series:
+    """Compute cumulative NAV from simple returns, starting at 1.0."""
+    return (1.0 + returns.dropna()).cumprod()
+
+
+def compute_drawdown_series(returns: pd.Series) -> pd.Series:
+    """Compute drawdown series from simple returns."""
+    nav = compute_nav(returns)
+    return nav / nav.cummax() - 1.0
 
 
 def plot_nav(
@@ -23,8 +34,8 @@ def plot_nav(
     portfolio, benchmark = _align_returns(portfolio_returns_net, benchmark_returns)
     nav = pd.DataFrame(
         {
-            "Strategy Net": _nav(portfolio),
-            "Benchmark": _nav(benchmark),
+            "Strategy Net": compute_nav(portfolio),
+            "Benchmark": compute_nav(benchmark),
         }
     )
 
@@ -38,7 +49,8 @@ def plot_cumulative_active_return(
 ) -> None:
     """Plot cumulative active return."""
     portfolio, benchmark = _align_returns(portfolio_returns_net, benchmark_returns)
-    cumulative_active = (portfolio - benchmark).cumsum()
+    active_returns = portfolio - benchmark
+    cumulative_active = (1.0 + active_returns).cumprod() - 1.0
 
     _line_plot(
         cumulative_active.rename("Cumulative Active Return"),
@@ -54,10 +66,30 @@ def plot_drawdown(
     title: str = "Drawdown",
 ) -> None:
     """Plot drawdown from a simple-return series."""
-    nav = _nav(returns.dropna())
-    drawdown = nav / nav.cummax() - 1.0
+    drawdown = compute_drawdown_series(returns)
+    min_dd = drawdown.min()
+    if pd.isna(min_dd):
+        min_dd = 0.0
+    lower = min_dd * 1.10 if min_dd < 0 else -0.05
+    upper = 0.02
 
-    _line_plot(drawdown.rename("Drawdown"), title, "Drawdown", output_path)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    drawdown.rename("Drawdown").plot(ax=ax)
+    ax.axhline(min_dd, color="tab:red", linestyle="--", linewidth=1.0)
+    ax.text(
+        0.02,
+        0.08,
+        f"Max DD: {min_dd:.1%}",
+        transform=ax.transAxes,
+        color="tab:red",
+        bbox={"facecolor": "white", "edgecolor": "tab:red", "alpha": 0.85},
+    )
+    ax.set_title(title)
+    ax.set_ylabel("Drawdown")
+    ax.set_ylim(lower, upper)
+    ax.grid(alpha=0.3)
+    fig.autofmt_xdate()
+    _save_figure(fig, output_path)
 
 
 def plot_turnover(turnover: pd.Series, output_path: str | Path) -> None:
@@ -80,7 +112,8 @@ def plot_rolling_active_return(
 ) -> None:
     """Plot rolling active return over a trailing window."""
     portfolio, benchmark = _align_returns(portfolio_returns_net, benchmark_returns)
-    rolling_active = (portfolio - benchmark).rolling(window).sum()
+    active_returns = portfolio - benchmark
+    rolling_active = active_returns.rolling(window).mean() * 252
 
     _line_plot(
         rolling_active.rename(f"Rolling {window}-Day Active Return"),
@@ -113,19 +146,25 @@ def plot_rolling_tracking_error(
 def write_summary_report(
     output_path: str | Path,
     performance_summary: pd.Series,
-    turnover: pd.Series,
-    transaction_cost_bps: float,
-    benchmark_name: str = "SPY",
-    universe_description: str = "current S&P 500 constituents",
-    notes: Optional[dict[str, Any]] = None,
+    config: dict[str, Any],
+    num_tickers: int,
+    date_start,
+    date_end,
+    num_observations: int,
+    final_nav: float,
+    average_turnover: float,
+    annualized_turnover: float,
 ) -> None:
     """Write a markdown summary report for the Version 0 backtest."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    notes = notes or {}
 
-    average_turnover = turnover.dropna().mean()
-    annualized_turnover = average_turnover * 12 if pd.notna(average_turnover) else pd.NA
+    benchmark_name = _get_config(config, ["data", "benchmark"], "SPY")
+    start_date = _get_config(config, ["data", "start_date"], date_start)
+    end_date = _get_config(config, ["data", "end_date"], date_end)
+    transaction_cost_bps = _get_config(config, ["costs", "transaction_cost_bps"], 10.0)
+    active_budget = _get_config(config, ["portfolio", "active_budget"], 0.20)
+    max_tickers = _get_config(config, ["data", "max_tickers"], None)
     total_return = performance_summary.get("total_return", pd.NA)
     information_ratio = performance_summary.get("information_ratio", pd.NA)
     tracking_error = performance_summary.get("tracking_error", pd.NA)
@@ -141,7 +180,25 @@ def write_summary_report(
             f"versus {benchmark_name}."
         ),
         "",
-        "## Universe Limitation",
+        "## Version 0 Description",
+        "",
+        (
+            "Version 0 is a simple rule-based baseline using price-based factors, "
+            "monthly rebalancing, a one-day trade lag, long-only portfolio "
+            "construction, turnover tracking, and transaction costs."
+        ),
+        "",
+        "## Data and Universe",
+        "",
+        f"- Date range: {date_start} to {date_end}",
+        f"- Configured start date: {start_date}",
+        f"- Configured end date: {end_date}",
+        f"- Number of stock tickers used: {num_tickers}",
+        f"- Configured max tickers: {max_tickers}",
+        "- Universe source: current S&P 500 constituents from Wikipedia",
+        "- Price data: adjusted close and volume from yfinance",
+        "",
+        "## Survivorship Bias Warning",
         "",
         (
             "This prototype uses the current S&P 500 constituents as a static "
@@ -151,9 +208,7 @@ def write_summary_report(
             "production-level evidence."
         ),
         "",
-        f"Universe used: {universe_description}.",
-        "",
-        "## Benchmark Limitation",
+        "## Benchmark Mismatch Warning",
         "",
         (
             f"The benchmark return series is proxied by {benchmark_name}. The "
@@ -161,6 +216,12 @@ def write_summary_report(
             "benchmark proxy, which is not the true historical S&P 500 weight "
             "structure."
         ),
+        "",
+        "## Transaction Cost Assumption",
+        "",
+        f"- Transaction cost: {transaction_cost_bps:g} bps one-way",
+        "- Cost convention: `2 * one_way_cost * turnover`",
+        f"- Active budget: {_format_value(active_budget)}",
         "",
         "## Performance Summary",
         "",
@@ -170,11 +231,8 @@ def write_summary_report(
         "",
         f"- Average turnover: {_format_value(average_turnover)}",
         f"- Annualized turnover: {_format_value(annualized_turnover)}",
-        "",
-        "## Transaction Cost Assumption",
-        "",
-        f"- Transaction cost: {transaction_cost_bps:g} bps one-way",
-        "- Cost convention: `2 * one_way_cost * turnover`",
+        f"- Portfolio return observations: {num_observations}",
+        f"- Final portfolio NAV: {_format_value(final_nav)}",
         "",
         "## Short Interpretation",
         "",
@@ -185,12 +243,14 @@ def write_summary_report(
             "results should be read together with turnover, transaction costs, "
             "and the static-universe survivorship limitation."
         ),
+        "",
+        "## Next Steps",
+        "",
+        "- Add cost sensitivity, active budget sensitivity, and factor mix sensitivity.",
+        "- Compare against an equal-weight universe benchmark as well as SPY.",
+        "- Add subperiod analysis and factor diagnostics such as IC and Rank IC.",
+        "- Add sector exposure reporting and optional sector neutralization.",
     ]
-
-    if notes:
-        report.extend(["", "## Run Details", ""])
-        for key, value in notes.items():
-            report.append(f"- {key}: {value}")
 
     output_path.write_text("\n".join(report) + "\n", encoding="utf-8")
 
@@ -209,10 +269,6 @@ def _align_returns(
     ).dropna()
 
     return aligned["portfolio"], aligned["benchmark"]
-
-
-def _nav(returns: pd.Series) -> pd.Series:
-    return (1.0 + returns.dropna()).cumprod()
 
 
 def _line_plot(
@@ -251,3 +307,13 @@ def _format_value(value: Any) -> str:
         return "nan"
 
     return f"{float(value):.6f}"
+
+
+def _get_config(config: dict[str, Any], keys: list[str], default: Any) -> Any:
+    value: Any = config
+    for key in keys:
+        if not isinstance(value, dict) or key not in value:
+            return default
+        value = value[key]
+
+    return default if value is None else value

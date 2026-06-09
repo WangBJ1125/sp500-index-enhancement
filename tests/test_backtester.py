@@ -155,3 +155,82 @@ def test_benchmark_returns_are_aligned_to_portfolio_return_dates():
 
     expected = benchmark_returns.loc[result.portfolio_returns_gross.index]
     pd.testing.assert_series_equal(result.benchmark_returns, expected)
+
+
+def test_external_benchmark_weights_are_used_as_starting_weights():
+    stock_returns, benchmark_returns, scores, rebalance_dates = _synthetic_inputs()
+    benchmark_weights = pd.Series({"A": 0.8, "B": 0.2})
+
+    result = run_backtest(
+        stock_returns,
+        benchmark_returns,
+        scores,
+        rebalance_dates,
+        benchmark_weights=benchmark_weights,
+        active_budget=0.0,
+        transaction_cost_bps=0.0,
+    )
+
+    first_active_weights = result.weights.loc[pd.Timestamp("2024-01-03")]
+
+    assert abs(first_active_weights.loc["A"] - 0.8) < 1e-12
+    assert abs(first_active_weights.loc["B"] - 0.2) < 1e-12
+
+
+def test_external_benchmark_weights_are_renormalized_over_valid_score_tickers():
+    stock_returns, benchmark_returns, scores, rebalance_dates = _synthetic_inputs()
+    benchmark_weights = pd.Series({"A": 0.2, "B": 0.3, "C": 0.5})
+
+    result = run_backtest(
+        stock_returns,
+        benchmark_returns,
+        scores,
+        rebalance_dates,
+        benchmark_weights=benchmark_weights,
+        active_budget=0.0,
+        transaction_cost_bps=0.0,
+    )
+
+    first_active_weights = result.weights.loc[pd.Timestamp("2024-01-03")]
+
+    assert abs(first_active_weights.loc["A"] - 0.4) < 1e-12
+    assert abs(first_active_weights.loc["B"] - 0.6) < 1e-12
+    assert "C" not in first_active_weights.index
+
+
+def test_missing_external_benchmark_weights_are_handled_safely():
+    stock_returns, benchmark_returns, scores, rebalance_dates = _synthetic_inputs()
+    benchmark_weights = pd.Series({"A": 0.8, "C": 0.2})
+
+    result = run_backtest(
+        stock_returns,
+        benchmark_returns,
+        scores,
+        rebalance_dates,
+        benchmark_weights=benchmark_weights,
+        active_budget=0.0,
+        transaction_cost_bps=0.0,
+    )
+
+    first_active_weights = result.weights.loc[pd.Timestamp("2024-01-03")]
+
+    assert abs(first_active_weights.loc["A"] - 1.0) < 1e-12
+    assert abs(first_active_weights.loc["B"]) < 1e-12
+
+
+def test_none_benchmark_weights_keeps_equal_weight_behavior():
+    stock_returns, benchmark_returns, scores, rebalance_dates = _synthetic_inputs()
+
+    result = run_backtest(
+        stock_returns,
+        benchmark_returns,
+        scores,
+        rebalance_dates,
+        benchmark_weights=None,
+        transaction_cost_bps=0.0,
+    )
+
+    first_active_weights = result.weights.loc[pd.Timestamp("2024-01-03")]
+
+    assert abs(first_active_weights.loc["A"] - 0.6) < 1e-12
+    assert abs(first_active_weights.loc["B"] - 0.4) < 1e-12
