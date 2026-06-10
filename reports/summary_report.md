@@ -10,9 +10,9 @@ Version 0 is a simple rule-based baseline using price-based factors, monthly reb
 
 ## Data and Universe
 
-- Date range: 2015-01-02 to 2026-06-08
+- Date range: 2015-01-02 to 2026-06-09
 - Configured start date: 2015-01-01
-- Configured end date: 2026-06-08
+- Configured end date: 2026-06-09
 - Number of stock tickers used: 503
 - Configured max tickers: None
 - Universe source: current S&P 500 constituents from Wikipedia
@@ -36,26 +36,26 @@ The benchmark return series is proxied by SPY. The portfolio construction curren
 
 | Metric | Value |
 |---|---:|
-| total_return | 12.179829 |
-| annualized_return | 0.283571 |
-| annualized_volatility | 0.205005 |
-| sharpe_ratio | 1.321135 |
+| total_return | 12.179864 |
+| annualized_return | 0.283449 |
+| annualized_volatility | 0.204965 |
+| sharpe_ratio | 1.320881 |
 | max_drawdown | -0.333005 |
-| hit_ratio | 0.576258 |
+| hit_ratio | 0.576421 |
 | annualized_active_return | 0.108990 |
 | tracking_error | 0.052837 |
-| information_ratio | 2.062752 |
+| information_ratio | 2.062754 |
 
 ## Turnover Summary
 
 - Average turnover: 0.052803
 - Annualized turnover: 0.633633
-- Portfolio return observations: 2603
-- Final portfolio NAV: 13.179829
+- Portfolio return observations: 2604
+- Final portfolio NAV: 13.179864
 
 ## Short Interpretation
 
-The strategy total return was 12.179829. Tracking error was 0.052837, and the information ratio was 2.062752. These results should be read together with turnover, transaction costs, and the static-universe survivorship limitation.
+The strategy total return was 12.179864. Tracking error was 0.052837, and the information ratio was 2.062754. These results should be read together with turnover, transaction costs, and the static-universe survivorship limitation.
 
 ## Next Steps
 

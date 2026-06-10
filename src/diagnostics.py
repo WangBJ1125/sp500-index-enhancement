@@ -160,6 +160,64 @@ def run_factor_ic_subperiod_analysis(
     return pd.DataFrame(rows)
 
 
+def compute_active_exposure_diagnostics(
+    weights: pd.DataFrame,
+    benchmark_weights: pd.Series,
+) -> pd.DataFrame:
+    """Compute active exposure diagnostics versus a benchmark weight proxy."""
+    common_tickers = weights.columns.intersection(benchmark_weights.index)
+    if len(common_tickers) == 0:
+        raise ValueError("weights and benchmark_weights have no common tickers.")
+
+    aligned_benchmark = benchmark_weights.reindex(common_tickers).dropna().astype(float)
+    benchmark_sum = aligned_benchmark.sum()
+    if benchmark_sum == 0 or pd.isna(benchmark_sum):
+        raise ValueError("benchmark_weights must sum to a non-zero value.")
+
+    normalized_benchmark = aligned_benchmark / benchmark_sum
+    aligned_weights = weights.loc[:, normalized_benchmark.index].fillna(0.0)
+
+    rows = []
+    for date, weights_row in aligned_weights.iterrows():
+        active_weights = weights_row - normalized_benchmark
+        absolute_active_weights = active_weights.abs()
+
+        rows.append(
+            {
+                "gross_active_exposure": absolute_active_weights.sum(),
+                "active_share": 0.5 * absolute_active_weights.sum(),
+                "net_active_weight": active_weights.sum(),
+                "max_absolute_active_weight": absolute_active_weights.max(),
+                "top_overweight": str(active_weights.idxmax()),
+                "top_underweight": str(active_weights.idxmin()),
+            }
+        )
+
+    return pd.DataFrame(rows, index=aligned_weights.index)
+
+
+def summarize_active_exposure(active_exposure_df: pd.DataFrame) -> pd.Series:
+    """Summarize active exposure diagnostics through time."""
+    return pd.Series(
+        {
+            "average_gross_active_exposure": active_exposure_df[
+                "gross_active_exposure"
+            ].mean(),
+            "average_active_share": active_exposure_df["active_share"].mean(),
+            "max_active_share": active_exposure_df["active_share"].max(),
+            "average_max_absolute_active_weight": active_exposure_df[
+                "max_absolute_active_weight"
+            ].mean(),
+            "max_absolute_active_weight": active_exposure_df[
+                "max_absolute_active_weight"
+            ].max(),
+            "average_abs_net_active_weight": active_exposure_df[
+                "net_active_weight"
+            ].abs().mean(),
+        }
+    )
+
+
 def _slice_period(
     series: pd.Series,
     start_date: str,

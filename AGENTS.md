@@ -8,43 +8,9 @@ S&P 500 Index Enhancement Research Framework
 
 This project builds a Python-based S&P 500 index enhancement research framework.
 
-The goal is not to forecast the broad market direction. The goal is to construct a long-only equity portfolio that stays close to the S&P 500 benchmark while taking small, systematic active tilts based on transparent cross-sectional factors.
+The goal is not to forecast the broad market direction. The goal is to construct a long-only equity portfolio that stays close to an S&P 500 benchmark proxy while taking small, systematic active tilts based on transparent cross-sectional signals.
 
-The main research question is:
-
-> Can simple, price-based cross-sectional factors generate positive active returns versus SPY after realistic implementation assumptions such as monthly rebalancing, transaction costs, turnover analysis, and active weight constraints?
-
-The project should be implemented in two stages:
-
-- **Version 0**: Simple rule-based baseline.
-- **Version 1**: More realistic index-enhancement framework with active-weight controls, transaction costs, turnover analysis, and optional sector neutralization.
-
-The code should be modular, readable, testable, and suitable for a student/research project in quantitative asset management.
-
----
-
-## Core Financial Concepts
-
-The portfolio return is:
-
-```math
-r_{p,t} = \sum_i w_{i,t-1} r_{i,t}
-```
-For factor construction, the project primarily uses log returns because they are time-additive and convenient for momentum and volatility estimation. For portfolio aggregation and NAV calculation, the project uses simple returns because portfolio returns are linear in asset simple returns.
-
-The benchmark return is usually proxied by SPY:
-
-```math
-r_{b,t} = r_{\text{SPY},t}
-```
-
-The active return is:
-
-```math
-r^{active}_t = r_{p,t} - r_{b,t}
-```
-
-The index-enhanced portfolio should be interpreted as:
+The central portfolio structure is:
 
 ```math
 w_{i,t} = b_{i,t} + a_{i,t}
@@ -54,21 +20,107 @@ where:
 
 - `w_{i,t}` is the strategy portfolio weight.
 - `b_{i,t}` is the benchmark or proxy benchmark weight.
-- `a_{i,t}` is the active weight.
+- `a_{i,t}` is the active weight generated from alpha scores.
 
-The active weights should satisfy:
+The project is a research prototype, not a production trading strategy. It should demonstrate a complete quant research workflow:
+
+1. data collection,
+2. factor construction,
+3. signal processing,
+4. benchmark-aware portfolio construction,
+5. backtesting with correct timing,
+6. transaction costs and turnover,
+7. performance reporting,
+8. robustness checks,
+9. factor diagnostics,
+10. active-risk diagnostics.
+
+The project currently has two major research stages:
+
+- **Version 0**: Working baseline and research diagnostics.
+- **Version 1**: Risk-controlled index enhancement framework.
+
+---
+
+## Current Project Status
+
+The project is currently around:
+
+```text
+Version 0.4 / early Version 1 transition
+```
+
+Completed so far:
+
+- End-to-end `python main.py` pipeline.
+- Current S&P 500 universe loader.
+- yfinance adjusted close and volume loader.
+- Simple and log return utilities.
+- Price-based factors:
+  - momentum,
+  - low volatility,
+  - short-term reversal.
+- Cross-sectional signal processing.
+- Monthly backtester with one-day trade lag.
+- Transaction cost handling.
+- Performance metrics.
+- Reporting and plots.
+- Robustness experiments:
+  - cost sensitivity,
+  - active budget sensitivity,
+  - factor variant sensitivity,
+  - subperiod analysis.
+- Benchmark hygiene:
+  - comparison versus SPY,
+  - comparison versus same-universe equal-weight benchmark.
+- Static current market-cap benchmark proxy.
+- Factor IC and Rank IC diagnostics.
+- Momentum parameter IC sensitivity.
+- Research notebooks for presentation and inspection.
+
+Important conclusion so far:
+
+> Static current market-cap benchmark weights make the framework conceptually closer to S&P 500 index enhancement, but they are not point-in-time and therefore introduce look-ahead bias. Strong performance under static current market-cap weights must not be interpreted as tradable historical evidence.
+
+---
+
+## Core Financial Concepts
+
+Portfolio simple return:
+
+```math
+r_{p,t} = \sum_i w_{i,t-1} r_{i,t}
+```
+
+For factor construction, the project may use log returns because they are time-additive and convenient for momentum and volatility estimation.
+
+For portfolio aggregation, NAV, and backtesting, the project must use simple returns because portfolio returns are linear in asset simple returns.
+
+Benchmark return is usually proxied by SPY:
+
+```math
+r_{b,t} = r_{\text{SPY},t}
+```
+
+Active return:
+
+```math
+r^{active}_t = r_{p,t} - r_{b,t}
+```
+
+Active weights should satisfy approximately:
 
 ```math
 \sum_i a_{i,t} = 0
 ```
 
-The portfolio weights should satisfy:
+Portfolio weights should satisfy:
 
 ```math
 \sum_i w_{i,t} = 1
 ```
 
-For this project, the portfolio should be long-only unless explicitly stated otherwise:
+The portfolio is long-only unless explicitly stated otherwise:
 
 ```math
 w_{i,t} \geq 0
@@ -84,8 +136,6 @@ At rebalance date `t`, the strategy may only use information available up to `t`
 
 Signals computed using data up to close of date `t` should be traded from the next trading day onward.
 
-Do not use future returns, future constituents, future benchmark weights, future fundamentals, or any data unavailable at the decision time.
-
 Correct logic:
 
 1. Use historical data up to date `t`.
@@ -95,617 +145,800 @@ Correct logic:
 
 Incorrect logic:
 
-- Using returns from `t+1` to `t+21` to choose weights at `t`.
-- Using full-sample mean and standard deviation for signal standardization.
-- Using future fundamental data in past backtests.
-- Using today's S&P 500 constituents without explicitly labeling survivorship bias.
-
----
+- Using returns from `t+1` to choose weights at `t`.
+- Using full-sample means and standard deviations for signal standardization.
+- Using future constituents or future benchmark weights.
+- Using current fundamentals for historical backtests.
+- Treating current market-cap weights as point-in-time historical weights.
 
 ### 2. Survivorship Bias
 
-The first implementation may use the current S&P 500 constituents as a static universe because this is easy to obtain from public sources.
+The current implementation may use current S&P 500 constituents as a static universe.
 
-However, this introduces survivorship bias.
+This introduces survivorship bias because historical removed constituents are missing.
 
-The README and reports must explicitly state:
+Reports and README must explicitly state:
 
-> This prototype uses the current S&P 500 constituents as a static universe. This introduces survivorship bias because stocks that were previously in the index but later removed are not included. Therefore, results should be interpreted as a research prototype rather than production-level evidence.
+> This prototype uses current S&P 500 constituents as a static universe. This introduces survivorship bias. Results should be interpreted as research-prototype evidence, not institutional-grade evidence.
 
-Do not claim that the results are fully institutional-grade unless historical point-in-time constituents are added.
+### 3. Static Market-Cap Benchmark Bias
 
----
+The project supports:
 
-### 3. Fundamental Data Limitation
+```yaml
+portfolio:
+  benchmark_weight_method: "market_cap_static"
+```
 
-Do not use current fundamental data, such as current P/E, P/B, ROE, margins, or earnings growth, to backtest historical strategies.
+This uses current market capitalizations from yfinance to approximate benchmark weights.
 
-Unless point-in-time fundamental data is available, only use price-based and volume-based signals.
+This is useful for making the framework conceptually closer to index enhancement, but it is not point-in-time.
+
+Reports must explicitly state:
+
+> Static current market-cap weights introduce look-ahead bias when applied to historical backtests. Strong results under this mode should be interpreted as framework demonstration, not tradable historical evidence.
+
+### 4. Fundamental Data Limitation
+
+Do not use current fundamental data such as current P/E, P/B, ROE, margins, or earnings growth for historical backtests unless point-in-time data is available.
 
 Allowed first-stage signals:
 
-- Momentum
-- Low volatility
-- Short-term reversal
-- Liquidity / average dollar volume
-- Beta, if estimated only with historical returns
+- Price momentum.
+- Low volatility.
+- Short-term reversal.
+- Liquidity / average dollar volume.
+- Beta estimated from historical returns.
+- Residual or risk-adjusted momentum estimated using historical returns.
 
-Avoid using non-point-in-time fundamentals.
+Avoid non-point-in-time fundamentals.
 
----
+### 5. Benchmark Interpretation
 
-# Version 0: Simple Rule-Based Baseline
+Different benchmarks answer different questions.
 
-## Objective
+- `SPY` comparison answers: how did the strategy perform versus a tradable S&P 500 ETF proxy?
+- Same-universe equal-weight comparison answers: did the factor tilt add value relative to the same stock universe?
+- Static market-cap proxy comparison answers: how does the framework behave when starting from a market-cap-like benchmark proxy?
 
-Build a simple, transparent, fully functioning index enhancement backtest.
-
-Version 0 should prioritize:
-
-- Correct time alignment.
-- Clean factor construction.
-- Clear portfolio construction.
-- Transaction cost sensitivity.
-- Basic performance analytics.
-
-Version 0 does not need optimization, machine learning, or a full risk model.
+Do not mix these interpretations.
 
 ---
 
-## Version 0 Data
+# Version 0: Completed Baseline and Diagnostics
 
-Use:
+## Version 0.1 — Working Baseline
 
-- Current S&P 500 constituents.
-- Daily adjusted close prices from `yfinance`.
-- Daily volume from `yfinance`.
-- SPY adjusted close as benchmark.
+Completed features:
 
-Suggested time range:
+- Static current S&P 500 universe from Wikipedia.
+- yfinance adjusted close and volume data.
+- Simple returns and log returns.
+- Price-based factors:
+  - momentum,
+  - low volatility,
+  - short-term reversal.
+- Cross-sectional signal processing:
+  - winsorization,
+  - z-scoring,
+  - composite score.
+- Score-based active weights.
+- Long-only portfolio construction.
+- Monthly rebalancing.
+- One trading day trade lag.
+- Transaction costs.
+- Basic performance metrics.
 
-- Start: `2015-01-01`
-- End: latest available date, or configurable.
+## Version 0.2 — Reporting and Robustness
 
-Use adjusted close prices for return calculations.
+Completed features:
+
+- NAV plot versus benchmark.
+- Cumulative active return plot.
+- Drawdown plot.
+- Turnover plot.
+- Rolling active return.
+- Rolling tracking error.
+- Markdown summary report.
+- Cost sensitivity.
+- Active budget sensitivity.
+- Factor variant sensitivity.
+- Subperiod performance.
+
+## Version 0.3 — Benchmark Hygiene
+
+Completed features:
+
+- Strategy versus SPY comparison.
+- Strategy versus same-universe equal-weight benchmark comparison.
+- Subperiod analysis by benchmark.
+- Identification of benchmark mismatch.
+
+Key finding:
+
+> The equal-weight proxy version could look positive versus SPY while being weak versus the same-universe equal-weight benchmark. This indicated that apparent alpha could be caused by benchmark mismatch.
+
+## Version 0.4 — Static Market-Cap Benchmark Proxy
+
+Completed features:
+
+- `src/benchmark.py`.
+- Current market-cap retrieval via yfinance.
+- Static market-cap benchmark weights.
+- Backtester support for external benchmark weights.
+- Configurable benchmark mode:
+  - `equal_weight`,
+  - `market_cap_static`.
+- Active-weight cap via `max_active_weight`.
+- Fixed bug where `max_weight=0.03` was unintentionally applied even when `max_weight: null`.
+
+Important rule:
+
+> In `market_cap_static` mode, avoid a hard absolute `max_weight` unless carefully justified. A 3% absolute cap can force mega-cap benchmark weights down and create unintended anti-mega-cap active bets.
+
+Preferred market-cap static config:
+
+```yaml
+portfolio:
+  benchmark_weight_method: "market_cap_static"
+  active_budget: 0.20
+  max_active_weight: 0.005
+  max_weight: null
+  max_monthly_turnover: null
+```
+
+## Version 0 Diagnostics
+
+Completed diagnostics:
+
+- Factor IC.
+- Rank IC.
+- IC subperiod analysis.
+- Momentum parameter IC sensitivity.
+
+Important findings:
+
+- The original equal-weight composite factor does not show robust positive IC.
+- Momentum is the most promising of the initial price-based signals, but its IC is modest.
+- Low volatility has weak or negative IC and may be better treated as risk control rather than a direct alpha factor.
+- Short-term reversal is unstable and tends to create high turnover.
+- Momentum parameter IC sensitivity suggests `lookback_days=126` and `skip_days=0` may be better than the original 12-1 momentum in the tested sample.
 
 ---
 
-## Version 0 Rebalancing
+# Version 1: Risk-Controlled Index Enhancement Framework
 
-Use monthly rebalancing.
+## Version 1 Objective
 
-Default rebalance dates:
+Version 1 should improve the project from a factor backtest prototype into a more realistic index-enhancement research framework.
 
-- Last available trading day of each month.
+Version 1 should focus on:
 
-At each rebalance date:
-
-1. Compute factor values using historical prices up to the rebalance date.
-2. Process signals cross-sectionally.
-3. Construct portfolio weights.
-4. Hold weights until the next rebalance period.
-5. Deduct transaction costs at rebalance.
-
----
-
-## Version 0 Factors
-
-Implement at least three price-based factors.
-
-### 1. 12-1 Momentum
-
-Use cumulative return from approximately 12 months ago to 1 month ago.
-
-```math
-\text{MOM}_{i,t} = \prod_{k=22}^{252} (1 + r_{i,t-k}) - 1
-```
-
-This skips the most recent 21 trading days to reduce short-term reversal noise.
-
-Higher momentum should imply higher score.
-
----
-
-### 2. 6-Month Low Volatility
-
-Estimate annualized volatility using the previous 126 trading days.
-
-```math
-\text{VOL}_{i,t} = \sqrt{252} \cdot \operatorname{std}(r_{i,t-126}, ..., r_{i,t-1})
-```
-
-Low volatility score should be:
-
-```math
-\text{LOWVOL}_{i,t} = - \text{VOL}_{i,t}
-```
-
-Lower volatility should imply higher score.
-
----
-
-### 3. 1-Month Short-Term Reversal
-
-Use negative recent 1-month return.
-
-```math
-\text{REV}_{i,t} = - \left( \frac{P_{i,t}}{P_{i,t-21}} - 1 \right)
-```
-
-Stocks that performed poorly in the most recent month receive a higher reversal score.
-
----
-
-## Version 0 Signal Processing
-
-For each rebalance date and for each factor:
-
-1. Select the current universe.
-2. Drop stocks with insufficient data.
-3. Winsorize cross-sectionally.
-4. Z-score cross-sectionally.
-
-Winsorization:
-
-```math
-x^{win}_{i,t} = \min(\max(x_{i,t}, q_{5\%,t}), q_{95\%,t})
-```
-
-Z-score:
-
-```math
-z_{i,t} = \frac{x^{win}_{i,t} - \mu_t}{\sigma_t}
-```
-
-Composite alpha score:
-
-```math
-\alpha_{i,t} = \frac{1}{3} z^{mom}_{i,t}
-              + \frac{1}{3} z^{lowvol}_{i,t}
-              + \frac{1}{3} z^{rev}_{i,t}
-```
-
-Then standardize the composite score again cross-sectionally.
-
----
-
-## Version 0 Portfolio Construction
-
-Recommended default construction:
-
-- Use equal-weight benchmark proxy within the available universe:
-
-```math
-b_{i,t} = \frac{1}{N_t}
-```
-
-- Convert composite scores into score-proportional active weights:
-
-```math
-a_{i,t} = A \cdot \frac{\alpha_{i,t}}{\sum_j |\alpha_{j,t}|}
-```
-
-where `A` is the active budget, for example `A = 0.20`.
-
-Then:
-
-```math
-w_{i,t} = b_{i,t} + a_{i,t}
-```
-
-After that:
-
-1. Clip negative weights to zero.
-2. Normalize weights to sum to 1.
-3. Store target weights.
-
-Alternative construction:
-
-- Rank stocks by composite alpha score.
-- Top 20% receive overweight.
-- Bottom 20% receive underweight.
-- Middle 60% remain close to benchmark.
-
-This top-bottom rule is simpler to explain but less smooth than score-proportional active weights.
-
----
-
-## Version 0 Transaction Costs
-
-At every rebalance date, compute turnover:
-
-```math
-\text{Turnover}_t = \frac{1}{2} \sum_i |w^{new}_{i,t} - w^{old}_{i,t}|
-```
-
-Cost model:
-
-```math
-\text{Cost}_t = 2 \cdot c \cdot \text{Turnover}_t
-```
-
-where `c` is one-way transaction cost.
-
-Run at least three assumptions:
-
-- `0 bps`
-- `5 bps`
-- `10 bps`
-
-For example:
-
-```python
-cost_bps = 10
-c = cost_bps / 10000
-```
-
-Net portfolio return:
-
-```math
-r^{net}_{p,t} = r^{gross}_{p,t} - \text{Cost}_t
-```
-
-The transaction cost should be deducted on the rebalance date or the first holding day after rebalance. Be consistent and document the convention.
-
----
-
-## Version 0 Performance Metrics
-
-Implement the following metrics:
-
-### Total Return
-
-```math
-R_{total} = \prod_t (1 + r_t) - 1
-```
-
-### Annualized Return
-
-```math
-R_{ann} = \left(\prod_t (1 + r_t)\right)^{252/T} - 1
-```
-
-### Annualized Volatility
-
-```math
-\sigma_{ann} = \sqrt{252} \cdot \operatorname{std}(r_t)
-```
-
-### Sharpe Ratio
-
-Assume zero risk-free rate in Version 0:
-
-```math
-\text{Sharpe} = \frac{R_{ann}}{\sigma_{ann}}
-```
-
-### Active Return
-
-```math
-r^{active}_t = r_{p,t} - r_{b,t}
-```
-
-### Annualized Active Return
-
-Recommended simple convention:
-
-```math
-R^{active}_{ann} = 252 \cdot \operatorname{mean}(r^{active}_t)
-```
-
-### Tracking Error
-
-```math
-\text{TE} = \sqrt{252} \cdot \operatorname{std}(r^{active}_t)
-```
-
-### Information Ratio
-
-```math
-\text{IR} = \frac{R^{active}_{ann}}{\text{TE}}
-```
-
-### Maximum Drawdown
-
-NAV:
-
-```math
-V_t = \prod_{k=1}^{t} (1+r_k)
-```
-
-Running maximum:
-
-```math
-M_t = \max_{s \leq t} V_s
-```
-
-Drawdown:
-
-```math
-DD_t = \frac{V_t}{M_t} - 1
-```
-
-Maximum drawdown:
-
-```math
-\text{MDD} = \min_t DD_t
-```
-
-### Turnover
-
-Report:
-
-- Average rebalance turnover.
-- Annualized turnover.
-
-For monthly rebalancing:
-
-```math
-\text{Annualized Turnover} = 12 \times \text{Average Monthly Turnover}
-```
-
-### Hit Ratio
-
-Monthly active hit ratio:
-
-```math
-\text{Hit Ratio} = \frac{\#\{m: r^{active}_m > 0\}}{\#\{m\}}
-```
-
----
-
-## Version 0 Factor Diagnostics
-
-Implement basic factor diagnostics.
-
-For each factor and for the composite score, calculate monthly cross-sectional IC.
-
-At rebalance date `t`, compute the cross-sectional correlation between factor score at `t` and future next-period return.
-
-```math
-\text{IC}_t = \operatorname{corr}(x_{i,t}, r_{i,t+1:t+h})
-```
-
-Also compute Rank IC using Spearman correlation.
-
-Report:
-
-- Mean IC.
-- Standard deviation of IC.
-- ICIR:
-
-```math
-\text{ICIR} = \frac{\operatorname{mean}(\text{IC})}{\operatorname{std}(\text{IC})}
-```
-
----
-
-# Version 1: More Realistic Index Enhancement
-
-## Objective
-
-Version 1 should improve Version 0 by making the portfolio construction more realistic.
-
-Add:
-
-- Explicit active weights.
-- Active budget control.
-- Single-name active weight caps.
-- Optional sector neutralization.
-- Turnover constraints or turnover penalty.
-- Better reporting of implementation costs.
-- More robustness checks.
+- active exposure diagnostics,
+- better alpha model construction,
+- risk-aware active tilts,
+- turnover and cost control,
+- sector exposure reporting,
+- clearer separation between alpha and risk control,
+- better interpretability.
 
 Version 1 still does not require machine learning.
 
 ---
 
-## Version 1 Benchmark Weights
+## Version 1.1 — Active Exposure Diagnostics
 
-If true S&P 500 historical benchmark weights are not available, use one of the following approximations:
+### Objective
 
-1. Equal-weight benchmark within available universe.
-2. Market-cap proxy weights if historical market cap data can be reliably obtained.
-3. SPY only for return benchmark, while portfolio starts from equal-weight proxy.
+Measure how far the portfolio is from the benchmark proxy.
 
-If using equal-weight proxy, clearly state this limitation.
+For each rebalance or active date, compute:
 
-Do not pretend equal-weight proxy is the true S&P 500 benchmark.
+```math
+\text{Gross Active Exposure}_t = \sum_i |w_{i,t} - b_{i,t}|
+```
+
+```math
+\text{Active Share}_t = \frac{1}{2}\sum_i |w_{i,t} - b_{i,t}|
+```
+
+```math
+\text{Net Active Weight}_t = \sum_i (w_{i,t} - b_{i,t})
+```
+
+```math
+\text{Max Absolute Active Weight}_t = \max_i |w_{i,t} - b_{i,t}|
+```
+
+Required outputs:
+
+- `reports/active_exposure_diagnostics.csv`
+- `reports/active_exposure_summary.csv`
+
+Expected checks:
+
+- `net_active_weight` should be close to zero.
+- `max_absolute_active_weight` should respect `max_active_weight` when configured.
+- `active_share` should remain in a range consistent with index enhancement.
+
+### Implementation Guidance
+
+Add to `src/diagnostics.py`:
+
+- `compute_active_exposure_diagnostics(weights, benchmark_weights)`
+- `summarize_active_exposure(active_exposure_df)`
+
+Do not change the backtester or portfolio construction logic when adding diagnostics.
 
 ---
 
-## Version 1 Active Weight Construction
+## Version 1.2 — Momentum Backtest Sensitivity
 
-Use:
+### Objective
+
+IC sensitivity is useful, but IC does not guarantee portfolio performance.
+
+Run momentum-only backtests for different momentum parameter combinations:
+
+```text
+lookback_days = [63, 126, 189, 252]
+skip_days = [0, 21]
+```
+
+Required output:
+
+- `reports/momentum_backtest_sensitivity.csv`
+
+Columns should include:
+
+- `lookback_days`
+- `skip_days`
+- `total_return`
+- `annualized_return`
+- `annualized_volatility`
+- `sharpe_ratio`
+- `max_drawdown`
+- `annualized_active_return`
+- `tracking_error`
+- `information_ratio`
+- `average_turnover`
+- `annualized_turnover`
+
+Purpose:
+
+> Compare IC sensitivity with actual portfolio backtest sensitivity before changing the default momentum specification.
+
+---
+
+## Version 1.3 — Alpha Model Layer
+
+### Objective
+
+Separate raw factor calculation from alpha-score construction.
+
+Create a dedicated alpha model layer, for example:
+
+```text
+src/alpha_model.py
+```
+
+The alpha model layer should build the final alpha score from processed factor scores.
+
+Supported alpha models should include:
+
+- `equal_weight_composite`
+- `momentum_only`
+- `risk_adjusted_momentum`
+- `momentum_reversal`
+- `custom_weighted`
+
+### Rationale
+
+Version 0 used:
+
+```math
+\alpha_{i,t}
+=
+\frac{1}{3} z^{mom}_{i,t}
++
+\frac{1}{3} z^{lowvol}_{i,t}
++
+\frac{1}{3} z^{rev}_{i,t}
+```
+
+But diagnostics showed that this equal-weight composite does not have robust positive IC.
+
+Version 1 should allow:
+
+#### Momentum-only alpha
+
+```math
+\alpha_{i,t} = z(MOM_{i,t})
+```
+
+#### Risk-adjusted momentum
+
+```math
+\alpha_{i,t} = z(MOM_{i,t}) + \lambda z(LOWVOL_{i,t})
+```
+
+where `LOWVOL` is used as a risk-control penalty or stabilizer, not as a main alpha factor.
+
+#### Momentum + reversal
+
+```math
+\alpha_{i,t} = z(MOM_{i,t}) + \lambda z(REV_{i,t})
+```
+
+Because reversal has high turnover, `lambda` should generally be small.
+
+Suggested config:
+
+```yaml
+alpha:
+  model: "momentum_only"
+  lowvol_penalty_weight: 0.25
+  reversal_weight: 0.20
+```
+
+The default can preserve old behavior:
+
+```yaml
+alpha:
+  model: "equal_weight_composite"
+```
+
+---
+
+## Version 1.4 — Sector Exposure Reporting
+
+### Objective
+
+Diagnose whether active return comes from stock selection or sector bets.
+
+Compute:
+
+```math
+\text{Sector Weight}_{g,t} = \sum_{i \in g} w_{i,t}
+```
+
+```math
+\text{Active Sector Weight}_{g,t} =
+\sum_{i \in g} (w_{i,t} - b_{i,t})
+```
+
+Suggested outputs:
+
+- `reports/sector_exposure_latest.csv`
+- `reports/active_sector_exposure_latest.csv`
+- `reports/sector_exposure_timeseries.csv`
+
+Important limitation:
+
+> Current sector labels from yfinance are not point-in-time. Sector reporting is acceptable as a prototype diagnostic only if clearly documented.
+
+Do not implement sector neutralization before sector exposure reporting is stable.
+
+---
+
+## Version 1.5 — Improved Factor Design
+
+After active diagnostics and alpha model modularization, consider better factor designs.
+
+Potential improvements:
+
+### 1. Residual Momentum
+
+Estimate historical market beta using SPY returns:
+
+```math
+r_{i,t} = \alpha_i + \beta_i r_{m,t} + \varepsilon_{i,t}
+```
+
+Then compute momentum from residual returns instead of raw returns.
+
+Purpose:
+
+> Reduce the extent to which momentum is simply market beta or mega-cap trend exposure.
+
+### 2. Risk-Adjusted Momentum
+
+Use momentum scaled or penalized by volatility:
+
+```math
+RAMOM_{i,t} =
+\frac{MOM_{i,t}}{\sigma_{i,t}}
+```
+
+or:
+
+```math
+RAMOM_{i,t} = z(MOM_{i,t}) + \lambda z(LOWVOL_{i,t})
+```
+
+### 3. Beta-Controlled Features
+
+Compute rolling beta to SPY and use it for diagnostics or active-risk control.
+
+### 4. Liquidity / Volume Features
+
+Possible prototype features:
+
+- average dollar volume,
+- change in average dollar volume,
+- volume-adjusted momentum.
+
+Do not add too many features before diagnostics are stable.
+
+---
+
+## Version 1.6 — Optional Machine Learning
+
+Machine learning should only be considered after the baseline and diagnostics are stable.
+
+ML should be used to generate alpha scores, not direct portfolio weights.
+
+Potential feature matrix:
+
+```text
+X_{i,t} = [
+  MOM_{3,0},
+  MOM_{6,0},
+  MOM_{9,0},
+  MOM_{12,0},
+  volatility,
+  reversal,
+  beta_to_spy,
+  liquidity
+]
+```
+
+Potential target:
+
+```math
+y_{i,t} = r_{i,t \to t+1}
+```
+
+or cross-sectional rank/relative return.
+
+Recommended first models:
+
+- Ridge regression.
+- Elastic Net.
+- Gradient boosting only after linear baselines are stable.
+
+Required ML validation:
+
+- walk-forward training,
+- no future data,
+- no full-sample scaling,
+- comparison against simple factor baseline,
+- IC and portfolio performance out-of-sample.
+
+Avoid deep learning unless there is a clear reason and enough data.
+
+---
+
+## Current Factor Definitions
+
+### Momentum
+
+Implemented by:
+
+```python
+compute_momentum_12_1(prices, lookback_days, skip_days, use_log=True)
+```
+
+General formula:
+
+```math
+MOM_{i,t} =
+\log\left(\frac{P_{i,t-\text{skip}}}{P_{i,t-\text{lookback}}}\right)
+```
+
+Original default:
+
+```yaml
+lookback_days: 252
+skip_days: 21
+```
+
+Preferred tested candidate from IC sensitivity:
+
+```yaml
+lookback_days: 126
+skip_days: 0
+```
+
+### Low Volatility
+
+Low volatility score:
+
+```math
+LOWVOL_{i,t} =
+-\sqrt{252}
+\cdot
+\operatorname{std}(\ell_{i,t-126}, \ldots, \ell_{i,t-1})
+```
+
+where `ell` is log return.
+
+Current interpretation:
+
+> Low-volatility should be treated carefully. IC evidence suggests it is not a strong standalone alpha factor in the current setup. It may be more suitable as a risk-control component.
+
+### Short-Term Reversal
+
+Short-term reversal:
+
+```math
+REV_{i,t}
+=
+-\log\left(\frac{P_{i,t}}{P_{i,t-21}}\right)
+```
+
+Current interpretation:
+
+> Reversal is unstable and tends to increase turnover. It should not receive a large weight without further evidence.
+
+### Composite
+
+Original equal-weight composite:
+
+```math
+\alpha_{i,t}
+=
+\frac{1}{3}z^{mom}_{i,t}
++
+\frac{1}{3}z^{lowvol}_{i,t}
++
+\frac{1}{3}z^{rev}_{i,t}
+```
+
+Current interpretation:
+
+> The original equal-weight composite is useful as a baseline but should not be treated as the preferred final alpha model.
+
+---
+
+## Signal Processing Requirements
+
+For each rebalance date and each factor:
+
+1. Drop stocks with insufficient data.
+2. Winsorize cross-sectionally.
+3. Z-score cross-sectionally.
+4. Combine factor scores according to the selected alpha model.
+5. Standardize final alpha score cross-sectionally if configured.
+
+Cross-sectional standardization must be date-by-date.
+
+Correct:
+
+```python
+df.mean(axis=1)
+df.std(axis=1)
+```
+
+Incorrect for this project:
+
+```python
+df.mean(axis=0)
+df.std(axis=0)
+```
+
+because that standardizes each stock through time rather than each date across stocks.
+
+---
+
+## Portfolio Construction Requirements
+
+The portfolio should be benchmark-aware:
 
 ```math
 w_t = b_t + a_t
 ```
 
-where:
+Active weights should be score-proportional and net-zero before constraints:
 
 ```math
-\sum_i a_{i,t} = 0
+a_{i,t}
+=
+A
+\cdot
+\frac{\alpha_{i,t} - \bar{\alpha}_t}
+{\sum_j |\alpha_{j,t} - \bar{\alpha}_t|}
 ```
 
-Suggested active score construction:
-
-```math
-a_{i,t}^{raw} = \alpha_{i,t}
-```
-
-Normalize active weights:
-
-```math
-a_{i,t} = A \cdot \frac{\alpha_{i,t}}{\sum_j |\alpha_{j,t}|}
-```
-
-where `A` is the active budget.
-
-Recommended defaults:
+Use:
 
 ```yaml
 active_budget: 0.20
-max_active_weight: 0.005
-max_weight: 0.03
-long_only: true
 ```
 
-Interpretation:
+as a default active exposure budget.
 
-- `active_budget = 0.20` means total absolute active weight is controlled.
-- `max_active_weight = 0.005` means no single stock can be overweighted or underweighted by more than 50 bps relative to benchmark.
-- `max_weight = 0.03` means no single stock can exceed 3% portfolio weight.
-
-After constraints:
-
-1. Enforce active weight caps.
-2. Add active weights to benchmark weights.
-3. Enforce long-only.
-4. Enforce max individual weight.
-5. Renormalize.
-6. Recalculate realized active weights.
-
----
-
-## Version 1 Turnover Constraint
-
-Compute turnover:
-
-```math
-\text{Turnover}_t = \frac{1}{2} \sum_i |w^{target}_{i,t} - w^{current}_{i,t}|
-```
-
-Optional hard constraint:
-
-```math
-\text{Turnover}_t \leq T_{\max}
-```
-
-Suggested default:
+Use:
 
 ```yaml
-max_monthly_turnover: 0.20
+max_active_weight: 0.005
 ```
 
-If raw target turnover exceeds the maximum, scale the trade vector:
+as a default single-name active weight cap for index enhancement.
 
-```math
-\Delta w_t = w^{target}_t - w^{current}_t
+In `market_cap_static` mode, prefer:
+
+```yaml
+max_weight: null
 ```
 
-Scale:
+unless a carefully justified absolute cap is added.
 
-```math
-\Delta w^{scaled}_t =
-\Delta w_t \cdot \frac{T_{\max}}{\text{Turnover}_t}
-```
+Reason:
 
-Then:
-
-```math
-w^{new}_t = w^{current}_t + \Delta w^{scaled}_t
-```
-
-Finally normalize if necessary.
+> An absolute cap such as 3% can force mega-cap names below their benchmark weights and create unintended active bets.
 
 ---
 
-## Version 1 Sector Neutralization
+## Turnover and Transaction Costs
 
-If sector data is available, implement optional sector neutralization.
-
-For each rebalance date, run a cross-sectional regression:
+Turnover:
 
 ```math
-z_{i,t} = \alpha_t + \sum_g \beta_{g,t} D_{i,g,t} + \varepsilon_{i,t}
+\text{Turnover}_t
+=
+\frac{1}{2}
+\sum_i |w^{new}_{i,t} - w^{old}_{i,t}|
 ```
 
-where `D_{i,g,t}` is a sector dummy.
-
-Use residuals as sector-neutral scores:
+Transaction cost:
 
 ```math
-z^{neutral}_{i,t} = \varepsilon_{i,t}
+\text{Cost}_t =
+2 \cdot c \cdot \text{Turnover}_t
 ```
 
-If sector data is not available, skip sector neutralization and document it.
+where:
 
-Do not use current sector classification if historical sector classification is required for a fully point-in-time backtest. For this project prototype, using current sector labels is acceptable only if clearly stated as an approximation.
+```python
+c = transaction_cost_bps / 10000
+```
+
+Transaction costs should be deducted only on the first active holding day after a rebalance, not every day.
 
 ---
 
-## Version 1 Risk Controls
+## Performance Metrics
 
-At minimum, report:
+The final report should include:
 
-- Number of holdings.
-- Top 10 weights.
-- Top 10 active weights.
-- Sector weights, if sector data exists.
-- Active sector weights, if sector data exists.
-- Turnover per rebalance.
-- Cost per rebalance.
-- Active return by month.
+- total return,
+- annualized return,
+- annualized volatility,
+- Sharpe ratio,
+- max drawdown,
+- hit ratio,
+- annualized active return,
+- tracking error,
+- information ratio,
+- average turnover,
+- annualized turnover.
 
-Optional but recommended:
+Do not report only total return and Sharpe.
 
-- Rolling 12-month active return.
-- Rolling 12-month tracking error.
-- Rolling 12-month information ratio.
+Always include active-return and benchmark-relative metrics.
 
 ---
 
-## Version 1 Robustness Checks
+## Robustness and Diagnostics
 
-Run strategy variants:
+The project should maintain and extend these diagnostics:
 
-### Factor Variants
+### Performance Robustness
 
-- Momentum only.
-- Low-volatility only.
-- Reversal only.
-- Momentum + low-volatility.
-- Momentum + low-volatility + reversal.
+- Cost sensitivity.
+- Active budget sensitivity.
+- Factor variant sensitivity.
+- Momentum backtest sensitivity.
+- Subperiod performance.
+- Benchmark comparison.
+- Subperiod by benchmark.
 
-### Cost Variants
+### Factor Diagnostics
 
-- 0 bps.
-- 5 bps.
-- 10 bps.
-- 20 bps.
+- IC.
+- Rank IC.
+- ICIR.
+- Hit rate.
+- IC subperiod analysis.
+- Momentum parameter IC sensitivity.
 
-### Rebalance Frequency
+### Portfolio Diagnostics
 
-- Monthly.
-- Quarterly.
+- Active exposure diagnostics.
+- Active share.
+- Max absolute active weight.
+- Top overweight / underweight names.
+- Turnover by rebalance.
+- Optional sector exposure diagnostics.
 
-### Time Subperiods
+---
 
-At least:
+## Expected Outputs
 
-- 2015-2019
-- 2020-2022
-- 2023-latest
+The project should generate:
 
-### Active Budget Sensitivity
+### Processed Data
 
-Test:
+Saved under:
 
-- `active_budget = 0.10`
-- `active_budget = 0.20`
-- `active_budget = 0.30`
+```text
+data/processed/
+```
+
+Typical files:
+
+- `portfolio_returns_gross.csv`
+- `portfolio_returns_net.csv`
+- `benchmark_returns.csv`
+- `weights.csv`
+- `turnover.csv`
+- `transaction_costs.csv`
+- `performance_summary.csv`
+- `static_market_cap_weights.csv`
+- `current_market_caps.csv`
+- `alpha_scores.csv` after Version 1.3
+
+### Reports
+
+Saved under:
+
+```text
+reports/
+```
+
+Typical files:
+
+- `summary_report.md`
+- `benchmark_comparison.csv`
+- `subperiod_by_benchmark.csv`
+- `cost_sensitivity.csv`
+- `active_budget_sensitivity.csv`
+- `factor_variant_sensitivity.csv`
+- `factor_ic_summary.csv`
+- `factor_ic_subperiod.csv`
+- `momentum_ic_sensitivity.csv`
+- `momentum_ic_sensitivity_subperiod.csv`
+- `momentum_backtest_sensitivity.csv` after Version 1.2
+- `active_exposure_diagnostics.csv` after Version 1.1
+- `active_exposure_summary.csv` after Version 1.1
+
+### Figures
+
+Saved under:
+
+```text
+reports/figures/
+```
+
+Typical figures:
+
+- strategy NAV vs benchmark NAV,
+- cumulative active return,
+- drawdown,
+- turnover,
+- rolling active return,
+- rolling tracking error.
 
 ---
 
 ## Suggested Repository Structure
 
-Use the following structure:
-
 ```text
 sp500-index-enhancement/
 │
 ├── AGENTS.md
+├── PROJECT_REVIEW.md
 ├── README.md
 ├── requirements.txt
 ├── config.yaml
@@ -723,22 +956,34 @@ sp500-index-enhancement/
 │
 ├── src/
 │   ├── __init__.py
-│   ├── data_loader.py
 │   ├── universe.py
+│   ├── data_loader.py
+│   ├── utils.py
 │   ├── factors.py
 │   ├── signal_processing.py
 │   ├── portfolio.py
 │   ├── backtester.py
 │   ├── performance.py
+│   ├── reporting.py
+│   ├── benchmark.py
+│   ├── experiments.py
 │   ├── diagnostics.py
-│   └── utils.py
+│   └── alpha_model.py       # Version 1.3
 │
 ├── tests/
+│   ├── test_universe.py
+│   ├── test_data_loader.py
+│   ├── test_utils.py
 │   ├── test_factors.py
 │   ├── test_signal_processing.py
 │   ├── test_portfolio.py
 │   ├── test_backtester.py
-│   └── test_performance.py
+│   ├── test_performance.py
+│   ├── test_reporting.py
+│   ├── test_benchmark.py
+│   ├── test_experiments.py
+│   ├── test_diagnostics.py
+│   └── test_alpha_model.py  # Version 1.3
 │
 ├── reports/
 │   ├── figures/
@@ -749,164 +994,9 @@ sp500-index-enhancement/
 
 ---
 
-## Module Responsibilities
+## Configuration Guidance
 
-### `src/data_loader.py`
-
-Responsible for:
-
-- Downloading price data from `yfinance`.
-- Downloading SPY benchmark data.
-- Loading saved local data.
-- Saving raw and processed data.
-- Handling missing values.
-- Aligning trading calendars.
-
-Do not silently forward-fill prices across long missing periods.
-
----
-
-### `src/universe.py`
-
-Responsible for:
-
-- Loading current S&P 500 tickers.
-- Cleaning ticker symbols for `yfinance`.
-- Creating static universe for Version 0.
-- Later extension: point-in-time universe.
-
-Must clearly expose whether the universe is static or point-in-time.
-
----
-
-### `src/factors.py`
-
-Responsible for computing raw factor values.
-
-Functions should include:
-
-- `compute_momentum_12_1(prices)`
-- `compute_low_volatility(returns, window=126)`
-- `compute_short_term_reversal(prices, window=21)`
-- Optional: `compute_average_dollar_volume(prices, volumes, window=21)`
-- Optional: `compute_beta_to_spy(returns, spy_returns, window=252)`
-
-All factor functions must use only historical rolling windows.
-
----
-
-### `src/signal_processing.py`
-
-Responsible for:
-
-- Winsorization.
-- Z-scoring.
-- Composite score construction.
-- Optional sector neutralization.
-- Handling missing factor values.
-
-Functions should include:
-
-- `winsorize_cross_section(factor_df, lower=0.05, upper=0.95)`
-- `zscore_cross_section(factor_df)`
-- `combine_factors(factor_dict, weights=None)`
-- `neutralize_by_sector(scores, sector_map)`
-
-Cross-sectional processing must be done date by date.
-
-Do not calculate mean or standard deviation using the full time series across all dates.
-
----
-
-### `src/portfolio.py`
-
-Responsible for converting scores to portfolio weights.
-
-Functions should include:
-
-- `equal_weight_benchmark(universe)`
-- `score_to_active_weights(scores, active_budget)`
-- `apply_active_weight_caps(active_weights, max_active_weight)`
-- `construct_long_only_portfolio(benchmark_weights, active_weights, max_weight=None)`
-- `calculate_turnover(old_weights, new_weights)`
-- `apply_turnover_limit(current_weights, target_weights, max_turnover)`
-
-Weights must sum to 1 after construction.
-
-Long-only portfolios must not contain negative weights.
-
----
-
-### `src/backtester.py`
-
-Responsible for the event-driven or period-based backtest loop.
-
-At each rebalance date:
-
-1. Get universe.
-2. Get historical data available up to that date.
-3. Compute factor scores.
-4. Construct target weights.
-5. Compute turnover.
-6. Deduct transaction cost.
-7. Apply weights to next period returns.
-8. Store results.
-
-The backtester must ensure proper timing.
-
-No future data should be used.
-
----
-
-### `src/performance.py`
-
-Responsible for performance metrics.
-
-Functions should include:
-
-- `annualized_return(returns, periods_per_year=252)`
-- `annualized_volatility(returns, periods_per_year=252)`
-- `sharpe_ratio(returns, risk_free_rate=0.0)`
-- `active_returns(portfolio_returns, benchmark_returns)`
-- `tracking_error(active_returns, periods_per_year=252)`
-- `information_ratio(active_returns, periods_per_year=252)`
-- `max_drawdown(returns)`
-- `hit_ratio(returns)`
-- `turnover_stats(turnover_series)`
-
----
-
-### `src/diagnostics.py`
-
-Responsible for factor and portfolio diagnostics.
-
-Functions should include:
-
-- `calculate_ic(scores, forward_returns)`
-- `calculate_rank_ic(scores, forward_returns)`
-- `factor_ic_summary(ic_series)`
-- `rolling_performance_metrics(...)`
-- `sector_exposure(weights, sector_map)`
-- `active_sector_exposure(portfolio_weights, benchmark_weights, sector_map)`
-
----
-
-### `src/utils.py`
-
-Responsible for:
-
-- Date handling.
-- Rebalance date generation.
-- Common validation helpers.
-- Logging.
-
----
-
-## Configuration
-
-Use `config.yaml` to store project parameters.
-
-Suggested default config:
+Recommended current Version 1 transition config:
 
 ```yaml
 data:
@@ -914,7 +1004,8 @@ data:
   end_date: null
   benchmark: "SPY"
   universe: "current_sp500"
-  price_field: "Adj Close"
+  max_tickers: null
+  refresh_market_caps: false
 
 backtest:
   rebalance_frequency: "M"
@@ -924,8 +1015,8 @@ backtest:
 factors:
   momentum:
     enabled: true
-    lookback_days: 252
-    skip_days: 21
+    lookback_days: 126
+    skip_days: 0
     weight: 0.3333
   low_volatility:
     enabled: true
@@ -936,6 +1027,11 @@ factors:
     lookback_days: 21
     weight: 0.3333
 
+alpha:
+  model: "equal_weight_composite"
+  lowvol_penalty_weight: 0.25
+  reversal_weight: 0.20
+
 signal_processing:
   winsorize_lower: 0.05
   winsorize_upper: 0.95
@@ -944,10 +1040,10 @@ signal_processing:
 
 portfolio:
   construction_method: "score_active_weight"
-  benchmark_weight_method: "equal_weight"
+  benchmark_weight_method: "market_cap_static"
   active_budget: 0.20
   max_active_weight: 0.005
-  max_weight: 0.03
+  max_weight: null
   long_only: true
   max_monthly_turnover: null
 
@@ -960,150 +1056,40 @@ costs:
 ## Coding Style Requirements
 
 - Use Python 3.10+.
-- Use `pandas`, `numpy`, `yfinance`, `matplotlib`.
-- Optional: `scipy`, `statsmodels`, `scikit-learn`, but avoid unnecessary complexity in Version 0.
+- Use `pandas`, `numpy`, `yfinance`, and `matplotlib`.
+- Optional libraries such as `scipy`, `statsmodels`, and `scikit-learn` are allowed only when they add clear value.
 - Keep functions small and testable.
 - Use type hints where reasonable.
 - Avoid hidden global state.
 - Avoid hard-coded paths.
-- Use `pathlib.Path` for paths.
-- Save intermediate data to `data/processed/` when useful.
+- Use `pathlib.Path`.
 - Write clear docstrings explaining financial assumptions.
+- Do not duplicate core logic in notebooks.
+- Notebooks should call `src/` functions or read saved outputs.
 
 ---
 
 ## Testing Requirements
 
-Create basic unit tests for:
+Maintain unit tests for:
 
-### Factor Tests
+- universe loading,
+- data loading,
+- return utilities,
+- factor calculations,
+- signal processing,
+- portfolio construction,
+- backtester timing,
+- performance metrics,
+- reporting,
+- benchmark utilities,
+- experiments,
+- diagnostics,
+- alpha model layer once added.
 
-- Momentum uses the correct lookback and skip window.
-- Low-volatility factor uses only past returns.
-- Reversal uses only the most recent past window.
-- Factor output has expected shape.
+Tests should use synthetic data or mocks when possible.
 
-### Signal Processing Tests
-
-- Winsorization caps extreme values.
-- Z-score produces approximately zero mean and unit standard deviation cross-sectionally.
-- Composite score handles missing values.
-
-### Portfolio Tests
-
-- Weights sum to 1.
-- Long-only constraint is respected.
-- Active budget is approximately respected.
-- Turnover calculation is correct.
-- Max weight cap is respected.
-
-### Backtester Tests
-
-- No future returns are used for signal generation.
-- Rebalance dates are generated correctly.
-- Transaction costs reduce returns.
-- Portfolio returns are aligned correctly with future holding-period returns.
-
-### Performance Tests
-
-- Annualized return calculation is correct for simple synthetic data.
-- Max drawdown calculation is correct.
-- Tracking error and IR are computed correctly.
-
----
-
-## Expected Outputs
-
-The project should generate:
-
-### Tables
-
-- Performance summary table.
-- Cost sensitivity table.
-- Factor IC summary table.
-- Turnover summary table.
-- Subperiod performance table.
-
-### Figures
-
-- Strategy NAV vs SPY NAV.
-- Active return cumulative curve.
-- Drawdown curve.
-- Rolling 12-month active return.
-- Rolling tracking error.
-- Monthly turnover.
-- Factor IC time series.
-
-Save figures to:
-
-```text
-reports/figures/
-```
-
-Save summary report to:
-
-```text
-reports/summary_report.md
-```
-
----
-
-## Performance Summary Table
-
-The final report should contain at least:
-
-| Metric | Strategy Gross | Strategy Net | SPY | Active Net |
-|---|---:|---:|---:|---:|
-| Annualized Return | | | | |
-| Annualized Volatility | | | | |
-| Sharpe Ratio | | | | |
-| Tracking Error | | | | |
-| Information Ratio | | | | |
-| Max Drawdown | | | | |
-| Hit Ratio | | | | |
-| Annualized Turnover | | | | |
-
----
-
-## Cost Sensitivity Table
-
-Run the same strategy under multiple transaction cost assumptions:
-
-| Cost Assumption | Annual Active Return | Tracking Error | Information Ratio | Max Drawdown | Annual Turnover |
-|---:|---:|---:|---:|---:|---:|
-| 0 bps | | | | | |
-| 5 bps | | | | | |
-| 10 bps | | | | | |
-| 20 bps | | | | | |
-
----
-
-## Robustness Analysis
-
-The report should discuss whether the strategy is robust across:
-
-- Different transaction costs.
-- Different subperiods.
-- Different factor combinations.
-- Different active budgets.
-- Different rebalance frequencies.
-
-Do not overstate results if performance is concentrated in one period or one factor.
-
----
-
-## Interpretation Guidelines
-
-When interpreting results, focus on:
-
-1. Does the strategy generate positive active return after costs?
-2. Is the information ratio positive and stable?
-3. Is tracking error controlled?
-4. Is turnover reasonable?
-5. Are results robust across subperiods?
-6. Which factor contributes most to performance?
-7. Does the strategy suffer in specific market regimes?
-8. Are results likely inflated by survivorship bias?
+Avoid live internet calls in tests.
 
 ---
 
@@ -1111,59 +1097,35 @@ When interpreting results, focus on:
 
 Do not:
 
-- Use future data.
-- Use current fundamental data for historical backtests.
-- Claim institutional-grade results with static current constituents.
-- Optimize too many parameters without reporting all experiments.
-- Add machine learning before the baseline is complete.
-- Ignore transaction costs.
-- Ignore turnover.
-- Ignore benchmark-relative metrics.
-- Only report total return and Sharpe.
-- Hide bad subperiods.
-- Overfit factor weights to maximize backtest performance.
+- use future data,
+- use current fundamentals for historical backtests,
+- claim institutional-grade results with static constituents or static current market caps,
+- optimize too many parameters without reporting all experiments,
+- add machine learning before baseline diagnostics are stable,
+- ignore transaction costs,
+- ignore turnover,
+- ignore benchmark-relative metrics,
+- hide bad subperiods,
+- overstate headline returns,
+- treat static current market-cap backtests as tradable evidence,
+- use hard absolute `max_weight=0.03` in market-cap benchmark mode unless explicitly justified.
 
 ---
 
-## Development Priority
+## Development Priority From Here
 
-Build in this order:
+Proceed in this order:
 
-1. Data download and cleaning.
-2. Static S&P 500 universe.
-3. Return calculation.
-4. Factor calculation.
-5. Signal processing.
-6. Simple portfolio construction.
-7. Monthly backtest loop.
-8. Transaction cost handling.
-9. Performance metrics.
-10. Factor IC diagnostics.
-11. Plots and reports.
-12. Version 1 constraints and robustness checks.
-13. Optional sector neutralization.
-14. Optional risk model.
-15. Optional machine learning only after the above is stable.
-
----
-
-## Definition of Done: Version 0
-
-Version 0 is complete when:
-
-- The project can download data from `yfinance`.
-- It can build a static current S&P 500 universe.
-- It computes 12-1 momentum, low volatility, and short-term reversal.
-- It combines signals into a composite score.
-- It creates a long-only monthly rebalanced portfolio.
-- It deducts transaction costs.
-- It compares performance against SPY.
-- It reports annual return, volatility, Sharpe, active return, tracking error, IR, max drawdown, turnover, and hit ratio.
-- It saves at least three plots:
-  - NAV vs SPY
-  - cumulative active return
-  - drawdown
-- It clearly states survivorship bias and other limitations.
+1. **Version 1.1**: Active exposure diagnostics.
+2. **Version 1.2**: Momentum parameter backtest sensitivity.
+3. **Version 1.3**: Alpha model layer.
+4. **Version 1.4**: Sector exposure reporting.
+5. **Version 1.5**: Improved factor design:
+   - residual momentum,
+   - risk-adjusted momentum,
+   - beta-adjusted features,
+   - liquidity features.
+6. **Version 1.6**: Optional simple ML alpha model after diagnostics are stable.
 
 ---
 
@@ -1171,17 +1133,26 @@ Version 0 is complete when:
 
 Version 1 is complete when:
 
-- Active weights are explicitly modeled.
-- Active budget is controlled.
-- Single-name active weight caps are implemented.
-- Max stock weight is implemented.
-- Turnover calculation is reliable.
-- Optional turnover limit is implemented.
-- Cost sensitivity analysis is included.
-- Robustness checks are included.
-- Factor IC and Rank IC are reported.
-- Optional sector neutralization is implemented if sector data is available.
-- The report explains both strengths and limitations of the strategy.
+- Active exposure diagnostics are implemented and saved.
+- Active share is reported.
+- Max absolute active weight is reported and checked against config.
+- Momentum backtest sensitivity is implemented.
+- The alpha model layer is implemented and configurable.
+- Low-volatility is no longer blindly treated as equal alpha unless explicitly selected.
+- Sector exposure reporting is available.
+- Robustness tables remain compatible with the selected benchmark mode.
+- Reports and notebooks explain:
+  - benchmark choice,
+  - active exposure,
+  - turnover,
+  - costs,
+  - IC results,
+  - limitations.
+- The project clearly distinguishes:
+  - factor alpha,
+  - benchmark mismatch,
+  - static market-cap look-ahead bias,
+  - implementation effects.
 
 ---
 
@@ -1189,13 +1160,16 @@ Version 1 is complete when:
 
 This project should be treated as a transparent quant research prototype.
 
-The goal is not to produce a perfect strategy. The goal is to demonstrate:
+The goal is not to produce a perfect strategy.
 
-- Correct financial thinking.
-- Clean implementation.
-- Awareness of backtesting pitfalls.
-- Understanding of active risk.
-- Ability to evaluate a strategy beyond headline returns.
-- Ability to explain results honestly.
+The goal is to demonstrate:
+
+- correct financial thinking,
+- clean implementation,
+- awareness of backtesting pitfalls,
+- understanding of benchmark-relative performance,
+- understanding of active risk,
+- ability to diagnose false alpha,
+- ability to explain results honestly.
 
 A modest but robust result is better than an impressive but biased backtest.

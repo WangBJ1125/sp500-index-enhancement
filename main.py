@@ -8,6 +8,7 @@ from typing import Any, Optional
 import pandas as pd
 import yaml
 
+# import necessary modules from src package
 from src.backtester import BacktestResult, run_backtest
 from src.benchmark import (
     get_current_market_caps,
@@ -17,8 +18,10 @@ from src.benchmark import (
 )
 from src.data_loader import download_price_data
 from src.diagnostics import (
+    compute_active_exposure_diagnostics,
     run_factor_ic_analysis,
     run_factor_ic_subperiod_analysis,
+    summarize_active_exposure,
 )
 from src.experiments import (
     compare_benchmarks,
@@ -26,6 +29,7 @@ from src.experiments import (
     run_active_budget_sensitivity,
     run_cost_sensitivity,
     run_factor_variant_sensitivity,
+    run_momentum_backtest_sensitivity,
     run_momentum_ic_sensitivity,
     run_subperiod_analysis_by_benchmark,
     run_subperiod_analysis,
@@ -76,6 +80,11 @@ MOMENTUM_IC_SENSITIVITY_PATH = Path("reports") / "momentum_ic_sensitivity.csv"
 MOMENTUM_IC_SENSITIVITY_SUBPERIOD_PATH = (
     Path("reports") / "momentum_ic_sensitivity_subperiod.csv"
 )
+MOMENTUM_BACKTEST_SENSITIVITY_PATH = (
+    Path("reports") / "momentum_backtest_sensitivity.csv"
+)
+ACTIVE_EXPOSURE_DIAGNOSTICS_PATH = Path("reports") / "active_exposure_diagnostics.csv"
+ACTIVE_EXPOSURE_SUMMARY_PATH = Path("reports") / "active_exposure_summary.csv"
 
 
 def main() -> None:
@@ -196,6 +205,21 @@ def main() -> None:
         stock_prices=stock_prices,
     )
     _save_outputs(result=result, summary=summary, output_dir=PROCESSED_DATA_DIR)
+    active_exposure_benchmark_weights = _active_exposure_benchmark_weights(
+        benchmark_weight_method=benchmark_weight_method,
+        benchmark_weights=benchmark_weights,
+        portfolio_columns=result.weights.columns,
+    )
+    active_exposure_diagnostics = compute_active_exposure_diagnostics(
+        result.weights,
+        active_exposure_benchmark_weights,
+    )
+    active_exposure_summary = summarize_active_exposure(active_exposure_diagnostics)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    active_exposure_diagnostics.to_csv(ACTIVE_EXPOSURE_DIAGNOSTICS_PATH)
+    active_exposure_summary.rename("value").to_csv(ACTIVE_EXPOSURE_SUMMARY_PATH)
+    print("\nActive Exposure Summary")
+    print(active_exposure_summary.to_string(float_format=lambda value: f"{value:.6f}"))
     equal_weight_benchmark_returns = compute_equal_weight_benchmark_returns(
         stock_simple_returns,
     ).reindex(result.portfolio_returns_net.index)
@@ -384,6 +408,32 @@ def main() -> None:
             float_format=lambda value: f"{value:.6f}",
         )
     )
+    momentum_backtest_sensitivity = run_momentum_backtest_sensitivity(
+        stock_prices=stock_prices,
+        stock_returns=stock_simple_returns,
+        benchmark_returns=benchmark_simple_returns,
+        rebalance_dates=rebalance_dates,
+        lookback_days_list=[63, 126, 189, 252],
+        skip_days_list=[0, 21],
+        benchmark_weights=benchmark_weights,
+        transaction_cost_bps=transaction_cost_bps,
+        active_budget=active_budget,
+        max_active_weight=max_active_weight,
+        max_weight=max_weight,
+        max_turnover=max_turnover,
+        trade_lag_days=trade_lag_days,
+    )
+    _save_experiment_table(
+        momentum_backtest_sensitivity,
+        MOMENTUM_BACKTEST_SENSITIVITY_PATH,
+    )
+    print("\nMomentum Backtest Sensitivity")
+    print(
+        momentum_backtest_sensitivity.to_string(
+            index=False,
+            float_format=lambda value: f"{value:.6f}",
+        )
+    )
     _write_reports(
         result=result,
         summary=summary,
@@ -420,6 +470,12 @@ def main() -> None:
         "Saved momentum IC sensitivity subperiod table to "
         f"{MOMENTUM_IC_SENSITIVITY_SUBPERIOD_PATH}"
     )
+    print(
+        "Saved momentum backtest sensitivity table to "
+        f"{MOMENTUM_BACKTEST_SENSITIVITY_PATH}"
+    )
+    print(f"Saved active exposure diagnostics to {ACTIVE_EXPOSURE_DIAGNOSTICS_PATH}")
+    print(f"Saved active exposure summary to {ACTIVE_EXPOSURE_SUMMARY_PATH}")
     print(f"Saved figures to {FIGURES_DIR}")
     print(f"Saved summary report to {SUMMARY_REPORT_PATH}")
 
@@ -548,6 +604,18 @@ def _load_benchmark_weights(
     print(static_weights.sort_values(ascending=False).head(10).to_string())
 
     return static_weights
+
+
+def _active_exposure_benchmark_weights(
+    benchmark_weight_method: str,
+    benchmark_weights: Optional[pd.Series],
+    portfolio_columns: pd.Index,
+) -> pd.Series:
+    if benchmark_weight_method == "market_cap_static" and benchmark_weights is not None:
+        return benchmark_weights
+
+    equal_weight = 1.0 / len(portfolio_columns)
+    return pd.Series(equal_weight, index=portfolio_columns, name="equal_weight")
 
 
 def _select_stock_universe(

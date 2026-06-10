@@ -9,6 +9,7 @@ from src.experiments import (
     run_active_budget_sensitivity,
     run_cost_sensitivity,
     run_factor_variant_sensitivity,
+    run_momentum_backtest_sensitivity,
     run_momentum_ic_sensitivity,
     run_subperiod_analysis_by_benchmark,
     run_subperiod_analysis,
@@ -185,6 +186,7 @@ def test_cost_sensitivity_returns_one_row_per_cost():
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "hit_ratio",
         "annualized_active_return",
         "tracking_error",
         "information_ratio",
@@ -228,6 +230,7 @@ def test_active_budget_sensitivity_returns_one_row_per_budget():
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "hit_ratio",
         "annualized_active_return",
         "tracking_error",
         "information_ratio",
@@ -573,3 +576,100 @@ def test_momentum_ic_sensitivity_returns_subperiod_table_when_periods_provided()
         "count",
     ]
     assert subperiod.loc[subperiod["period"] == "empty", "count"].iloc[0] == 0
+
+
+def test_momentum_backtest_sensitivity_returns_one_row_per_parameter_combination(
+    monkeypatch,
+):
+    prices, rebalance_dates = _synthetic_momentum_prices()
+    stock_returns = prices.pct_change()
+    benchmark_returns = pd.Series(0.0, index=prices.index)
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_momentum_backtest_sensitivity(
+        stock_prices=prices,
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        lookback_days_list=[1, 2],
+        skip_days_list=[0, 1],
+    )
+
+    assert len(result) == 4
+    assert set(zip(result["lookback_days"], result["skip_days"])) == {
+        (1, 0),
+        (1, 1),
+        (2, 0),
+        (2, 1),
+    }
+    assert result.columns.tolist() == [
+        "lookback_days",
+        "skip_days",
+        "total_return",
+        "annualized_return",
+        "annualized_volatility",
+        "sharpe_ratio",
+        "max_drawdown",
+        "hit_ratio",
+        "annualized_active_return",
+        "tracking_error",
+        "information_ratio",
+        "average_turnover",
+        "annualized_turnover",
+    ]
+
+
+def test_momentum_backtest_sensitivity_passes_benchmark_weights_to_backtest(
+    monkeypatch,
+):
+    prices, rebalance_dates = _synthetic_momentum_prices()
+    stock_returns = prices.pct_change()
+    benchmark_returns = pd.Series(0.0, index=prices.index)
+    benchmark_weights = pd.Series({"A": 0.6, "B": 0.3, "C": 0.1})
+    captured = []
+
+    def fake_run_backtest(**kwargs):
+        captured.append(kwargs["benchmark_weights"])
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    run_momentum_backtest_sensitivity(
+        stock_prices=prices,
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        lookback_days_list=[1],
+        skip_days_list=[0],
+        benchmark_weights=benchmark_weights,
+    )
+
+    assert len(captured) == 1
+    assert captured[0] is benchmark_weights
+
+
+def test_momentum_backtest_sensitivity_handles_skip_days_zero(monkeypatch):
+    prices, rebalance_dates = _synthetic_momentum_prices()
+    stock_returns = prices.pct_change()
+    benchmark_returns = pd.Series(0.0, index=prices.index)
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_momentum_backtest_sensitivity(
+        stock_prices=prices,
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        lookback_days_list=[1],
+        skip_days_list=[0],
+    )
+
+    assert result.loc[0, "skip_days"] == 0
+    assert len(result) == 1

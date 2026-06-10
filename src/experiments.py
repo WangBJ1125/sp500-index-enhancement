@@ -69,6 +69,7 @@ def run_cost_sensitivity(
                     "annualized_volatility",
                     "sharpe_ratio",
                     "max_drawdown",
+                    "hit_ratio",
                     "annualized_active_return",
                     "tracking_error",
                     "information_ratio",
@@ -84,6 +85,7 @@ def run_cost_sensitivity(
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "hit_ratio",
         "annualized_active_return",
         "tracking_error",
         "information_ratio",
@@ -151,6 +153,7 @@ def run_active_budget_sensitivity(
                     "annualized_volatility",
                     "sharpe_ratio",
                     "max_drawdown",
+                    "hit_ratio",
                     "annualized_active_return",
                     "tracking_error",
                     "information_ratio",
@@ -166,6 +169,7 @@ def run_active_budget_sensitivity(
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "hit_ratio",
         "annualized_active_return",
         "tracking_error",
         "information_ratio",
@@ -242,6 +246,7 @@ def run_factor_variant_sensitivity(
                     "annualized_volatility",
                     "sharpe_ratio",
                     "max_drawdown",
+                    "hit_ratio",
                     "annualized_active_return",
                     "tracking_error",
                     "information_ratio",
@@ -258,6 +263,7 @@ def run_factor_variant_sensitivity(
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "hit_ratio",
         "annualized_active_return",
         "tracking_error",
         "information_ratio",
@@ -526,6 +532,80 @@ def run_momentum_ic_sensitivity(
         columns=_momentum_ic_subperiod_columns(),
     )
     return overall_summary, subperiod_summary
+
+
+def run_momentum_backtest_sensitivity(
+    stock_prices: pd.DataFrame,
+    stock_returns: pd.DataFrame,
+    benchmark_returns: pd.Series,
+    rebalance_dates,
+    lookback_days_list,
+    skip_days_list,
+    benchmark_weights: pd.Series | None = None,
+    transaction_cost_bps: float = 10.0,
+    active_budget: float = 0.20,
+    max_active_weight: float | None = None,
+    max_weight: float | None = None,
+    max_turnover: float | None = None,
+    trade_lag_days: int = 1,
+    periods_per_year: int = 252,
+) -> pd.DataFrame:
+    """Backtest single-factor momentum variants across parameter choices."""
+    rows: list[dict[str, object]] = []
+
+    for lookback_days in lookback_days_list:
+        for skip_days in skip_days_list:
+            momentum_scores = compute_momentum_12_1(
+                stock_prices,
+                lookback_days=lookback_days,
+                skip_days=skip_days,
+                use_log=True,
+            )
+            result = run_backtest(
+                stock_returns=stock_returns,
+                benchmark_returns=benchmark_returns,
+                scores=momentum_scores,
+                rebalance_dates=rebalance_dates,
+                active_budget=active_budget,
+                transaction_cost_bps=transaction_cost_bps,
+                max_active_weight=max_active_weight,
+                max_weight=max_weight,
+                max_turnover=max_turnover,
+                trade_lag_days=trade_lag_days,
+                benchmark_weights=benchmark_weights,
+            )
+            summary = performance_summary(
+                result.portfolio_returns_net,
+                benchmark_returns=result.benchmark_returns,
+                periods_per_year=periods_per_year,
+            )
+            average_turnover = result.turnover.mean()
+
+            row = {
+                "lookback_days": int(lookback_days),
+                "skip_days": int(skip_days),
+                "average_turnover": average_turnover,
+                "annualized_turnover": average_turnover * 12,
+            }
+            row.update(_summary_metrics(summary))
+            rows.append(row)
+
+    columns = [
+        "lookback_days",
+        "skip_days",
+        "total_return",
+        "annualized_return",
+        "annualized_volatility",
+        "sharpe_ratio",
+        "max_drawdown",
+        "hit_ratio",
+        "annualized_active_return",
+        "tracking_error",
+        "information_ratio",
+        "average_turnover",
+        "annualized_turnover",
+    ]
+    return pd.DataFrame(rows, columns=columns)
 
 
 def _momentum_ic_row(
