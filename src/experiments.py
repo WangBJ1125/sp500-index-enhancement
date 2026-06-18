@@ -4,8 +4,15 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.alpha_model import build_alpha_score
 from src.backtester import run_backtest
-from src.diagnostics import calculate_ic, compute_forward_returns, ic_summary
+from src.diagnostics import (
+    calculate_ic,
+    compute_active_exposure_diagnostics,
+    compute_forward_returns,
+    ic_summary,
+    summarize_active_exposure,
+)
 from src.factors import compute_momentum_12_1
 from src.performance import performance_summary
 from src.signal_processing import combine_factors
@@ -269,6 +276,109 @@ def run_factor_variant_sensitivity(
         "information_ratio",
         "average_turnover",
         "annualized_turnover",
+    ]
+    return pd.DataFrame(rows, columns=columns)
+
+
+def run_alpha_model_sensitivity(
+    factor_scores: dict[str, pd.DataFrame],
+    stock_returns: pd.DataFrame,
+    benchmark_returns: pd.Series,
+    rebalance_dates,
+    alpha_model_configs: list[dict[str, object]],
+    benchmark_weights: pd.Series | None = None,
+    transaction_cost_bps: float = 10.0,
+    active_budget: float = 0.20,
+    max_active_weight: float | None = None,
+    max_weight: float | None = None,
+    max_turnover: float | None = None,
+    trade_lag_days: int = 1,
+    periods_per_year: int = 252,
+) -> pd.DataFrame:
+    """Run backtests across alpha model construction choices."""
+    rows: list[dict[str, object]] = []
+
+    for alpha_config in alpha_model_configs:
+        model = str(alpha_config.get("model", "equal_weight_composite"))
+        lowvol_penalty_weight = alpha_config.get("lowvol_penalty_weight", pd.NA)
+        reversal_weight = alpha_config.get("reversal_weight", pd.NA)
+
+        alpha_scores = build_alpha_score(
+            factor_scores,
+            model=model,
+            weights=alpha_config.get("weights"),
+            lowvol_penalty_weight=alpha_config.get("lowvol_penalty_weight", 0.25),
+            reversal_weight=alpha_config.get("reversal_weight", 0.20),
+            standardize=alpha_config.get("standardize", True),
+        )
+        result = run_backtest(
+            stock_returns=stock_returns,
+            benchmark_returns=benchmark_returns,
+            scores=alpha_scores,
+            rebalance_dates=rebalance_dates,
+            active_budget=active_budget,
+            transaction_cost_bps=transaction_cost_bps,
+            max_active_weight=max_active_weight,
+            max_weight=max_weight,
+            max_turnover=max_turnover,
+            trade_lag_days=trade_lag_days,
+            benchmark_weights=benchmark_weights,
+        )
+        summary = performance_summary(
+            result.portfolio_returns_net,
+            benchmark_returns=result.benchmark_returns,
+            periods_per_year=periods_per_year,
+        )
+        average_turnover = result.turnover.mean()
+
+        row = {
+            "alpha_model": model,
+            "lowvol_penalty_weight": lowvol_penalty_weight,
+            "reversal_weight": reversal_weight,
+            "average_turnover": average_turnover,
+            "annualized_turnover": average_turnover * 12,
+            "average_active_share": pd.NA,
+            "max_active_share": pd.NA,
+            "max_absolute_active_weight": pd.NA,
+        }
+        row.update(_summary_metrics(summary))
+
+        if benchmark_weights is not None:
+            exposure_summary = summarize_active_exposure(
+                compute_active_exposure_diagnostics(result.weights, benchmark_weights)
+            )
+            row.update(
+                {
+                    "average_active_share": exposure_summary[
+                        "average_active_share"
+                    ],
+                    "max_active_share": exposure_summary["max_active_share"],
+                    "max_absolute_active_weight": exposure_summary[
+                        "max_absolute_active_weight"
+                    ],
+                }
+            )
+
+        rows.append(row)
+
+    columns = [
+        "alpha_model",
+        "lowvol_penalty_weight",
+        "reversal_weight",
+        "total_return",
+        "annualized_return",
+        "annualized_volatility",
+        "sharpe_ratio",
+        "max_drawdown",
+        "hit_ratio",
+        "annualized_active_return",
+        "tracking_error",
+        "information_ratio",
+        "average_turnover",
+        "annualized_turnover",
+        "average_active_share",
+        "max_active_share",
+        "max_absolute_active_weight",
     ]
     return pd.DataFrame(rows, columns=columns)
 

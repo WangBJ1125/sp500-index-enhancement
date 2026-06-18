@@ -7,6 +7,7 @@ from src.experiments import (
     compare_benchmarks,
     compute_equal_weight_benchmark_returns,
     run_active_budget_sensitivity,
+    run_alpha_model_sensitivity,
     run_cost_sensitivity,
     run_factor_variant_sensitivity,
     run_momentum_backtest_sensitivity,
@@ -90,6 +91,16 @@ def _fake_backtest_result():
         portfolio_returns_net=pd.Series([0.01], index=dates),
         benchmark_returns=pd.Series([0.00], index=dates),
         turnover=pd.Series([0.10], index=dates),
+    )
+
+
+def _fake_backtest_result_with_weights():
+    dates = pd.to_datetime(["2024-01-03"])
+    return types.SimpleNamespace(
+        portfolio_returns_net=pd.Series([0.01], index=dates),
+        benchmark_returns=pd.Series([0.00], index=dates),
+        turnover=pd.Series([0.10], index=dates),
+        weights=pd.DataFrame({"A": [0.55], "B": [0.45]}, index=dates),
     )
 
 
@@ -322,6 +333,139 @@ def test_factor_variant_sensitivity_includes_active_metrics():
 
     assert "information_ratio" in result.columns
     assert "annualized_active_return" in result.columns
+
+
+def test_alpha_model_sensitivity_returns_one_row_per_alpha_model_config(monkeypatch):
+    stock_returns, benchmark_returns, _scores, rebalance_dates = _synthetic_inputs()
+    alpha_model_configs = [
+        {"model": "equal_weight_composite"},
+        {"model": "momentum_only"},
+        {"model": "risk_adjusted_momentum", "lowvol_penalty_weight": 0.25},
+    ]
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_alpha_model_sensitivity(
+        factor_scores=_synthetic_factor_dict(),
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=alpha_model_configs,
+    )
+
+    assert len(result) == 3
+    assert result["alpha_model"].tolist() == [
+        "equal_weight_composite",
+        "momentum_only",
+        "risk_adjusted_momentum",
+    ]
+
+
+def test_alpha_model_sensitivity_calls_build_alpha_score_for_each_config(
+    monkeypatch,
+):
+    stock_returns, benchmark_returns, _scores, rebalance_dates = _synthetic_inputs()
+    factor_scores = _synthetic_factor_dict()
+    captured_models = []
+
+    def fake_build_alpha_score(factor_scores_arg, **kwargs):
+        captured_models.append(kwargs["model"])
+        return factor_scores_arg["momentum"]
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "build_alpha_score", fake_build_alpha_score)
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    run_alpha_model_sensitivity(
+        factor_scores=factor_scores,
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=[
+            {"model": "momentum_only"},
+            {"model": "momentum_reversal", "reversal_weight": 0.20},
+        ],
+    )
+
+    assert captured_models == ["momentum_only", "momentum_reversal"]
+
+
+def test_alpha_model_sensitivity_includes_turnover_columns(monkeypatch):
+    stock_returns, benchmark_returns, _scores, rebalance_dates = _synthetic_inputs()
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_alpha_model_sensitivity(
+        factor_scores=_synthetic_factor_dict(),
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=[{"model": "momentum_only"}],
+    )
+
+    assert "average_turnover" in result.columns
+    assert "annualized_turnover" in result.columns
+    assert result.loc[0, "average_turnover"] == 0.10
+    assert abs(result.loc[0, "annualized_turnover"] - 1.20) < 1e-12
+
+
+def test_alpha_model_sensitivity_includes_active_exposure_with_benchmark_weights(
+    monkeypatch,
+):
+    stock_returns, benchmark_returns, _scores, rebalance_dates = _synthetic_inputs()
+    benchmark_weights = pd.Series({"A": 0.50, "B": 0.50})
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result_with_weights()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_alpha_model_sensitivity(
+        factor_scores=_synthetic_factor_dict(),
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=[{"model": "momentum_only"}],
+        benchmark_weights=benchmark_weights,
+    )
+
+    assert "average_active_share" in result.columns
+    assert "max_active_share" in result.columns
+    assert "max_absolute_active_weight" in result.columns
+    assert abs(result.loc[0, "average_active_share"] - 0.05) < 1e-12
+    assert abs(result.loc[0, "max_absolute_active_weight"] - 0.05) < 1e-12
+
+
+def test_alpha_model_sensitivity_handles_missing_active_exposure_gracefully(
+    monkeypatch,
+):
+    stock_returns, benchmark_returns, _scores, rebalance_dates = _synthetic_inputs()
+
+    def fake_run_backtest(**kwargs):
+        return _fake_backtest_result()
+
+    monkeypatch.setattr(experiments, "run_backtest", fake_run_backtest)
+
+    result = run_alpha_model_sensitivity(
+        factor_scores=_synthetic_factor_dict(),
+        stock_returns=stock_returns,
+        benchmark_returns=benchmark_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=[{"model": "momentum_only"}],
+        benchmark_weights=None,
+    )
+
+    assert pd.isna(result.loc[0, "average_active_share"])
+    assert pd.isna(result.loc[0, "max_active_share"])
+    assert pd.isna(result.loc[0, "max_absolute_active_weight"])
 
 
 def test_subperiod_analysis_returns_one_row_per_period():

@@ -9,15 +9,15 @@ data:
   # 100 for now, set to "null" when everthing is working
 
 backtest:
-  rebalance_frequency: "M"
+  rebalance_frequency: "M" # Monthly
   trade_lag_days: 1
   initial_capital: 1.0
 
 factors:
   momentum:
     enabled: true
-    lookback_days: 252
-    skip_days: 21
+    lookback_days: 126 # could also use 252, but we see 126 was a better choice
+    skip_days: 0  # 21 for 252
     weight: 0.3333
   low_volatility:
     enabled: true
@@ -27,6 +27,13 @@ factors:
     enabled: true
     lookback_days: 21
     weight: 0.3333
+
+
+alpha:
+  model: "risk_adjusted_momentum"
+  lowvol_penalty_weight: 0.25
+  reversal_weight: 0.20
+  weights: null
 
 signal_processing:
   winsorize_lower: 0.05

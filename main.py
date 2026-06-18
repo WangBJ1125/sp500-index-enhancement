@@ -9,6 +9,7 @@ import pandas as pd
 import yaml
 
 # import necessary modules from src package
+from src.alpha_model import build_alpha_score
 from src.backtester import BacktestResult, run_backtest
 from src.benchmark import (
     get_current_market_caps,
@@ -27,6 +28,7 @@ from src.experiments import (
     compare_benchmarks,
     compute_equal_weight_benchmark_returns,
     run_active_budget_sensitivity,
+    run_alpha_model_sensitivity,
     run_cost_sensitivity,
     run_factor_variant_sensitivity,
     run_momentum_backtest_sensitivity,
@@ -49,7 +51,6 @@ from src.reporting import (
     plot_turnover,
     write_summary_report,
 )
-from src.signal_processing import combine_factors
 from src.universe import get_current_sp500_tickers
 from src.utils import (
     compute_log_returns,
@@ -71,6 +72,7 @@ SUMMARY_REPORT_PATH = Path("reports") / "summary_report.md"
 COST_SENSITIVITY_PATH = Path("reports") / "cost_sensitivity.csv"
 ACTIVE_BUDGET_SENSITIVITY_PATH = Path("reports") / "active_budget_sensitivity.csv"
 FACTOR_VARIANT_SENSITIVITY_PATH = Path("reports") / "factor_variant_sensitivity.csv"
+ALPHA_MODEL_SENSITIVITY_PATH = Path("reports") / "alpha_model_sensitivity.csv"
 SUBPERIOD_PERFORMANCE_PATH = Path("reports") / "subperiod_performance.csv"
 BENCHMARK_COMPARISON_PATH = Path("reports") / "benchmark_comparison.csv"
 SUBPERIOD_BY_BENCHMARK_PATH = Path("reports") / "subperiod_by_benchmark.csv"
@@ -85,6 +87,7 @@ MOMENTUM_BACKTEST_SENSITIVITY_PATH = (
 )
 ACTIVE_EXPOSURE_DIAGNOSTICS_PATH = Path("reports") / "active_exposure_diagnostics.csv"
 ACTIVE_EXPOSURE_SUMMARY_PATH = Path("reports") / "active_exposure_summary.csv"
+ALPHA_SCORES_PATH = PROCESSED_DATA_DIR / "alpha_scores.csv"
 
 
 def main() -> None:
@@ -111,6 +114,16 @@ def main() -> None:
     momentum_skip_days = int(
         _get_config(config, ["factors", "momentum", "skip_days"], 21)
     )
+    alpha_model = str(
+        _get_config(config, ["alpha", "model"], "equal_weight_composite")
+    ).strip()
+    alpha_lowvol_penalty_weight = float(
+        _get_config(config, ["alpha", "lowvol_penalty_weight"], 0.25)
+    )
+    alpha_reversal_weight = float(
+        _get_config(config, ["alpha", "reversal_weight"], 0.20)
+    )
+    alpha_weights = _get_config(config, ["alpha", "weights"], None)
 
     print("Loading current S&P 500 universe...")
     stock_tickers = _select_stock_universe(
@@ -163,10 +176,14 @@ def main() -> None:
         "lowvol": low_volatility,
         "reversal": reversal,
     }
-    composite_scores = combine_factors(
+    print(f"Alpha model: {alpha_model}")
+    alpha_scores = build_alpha_score(
         factor_scores,
-        weights=None,
-        standardize_composite=True,
+        model=alpha_model,
+        weights=alpha_weights,
+        lowvol_penalty_weight=alpha_lowvol_penalty_weight,
+        reversal_weight=alpha_reversal_weight,
+        standardize=True,
     )
 
     rebalance_dates = get_month_end_rebalance_dates(stock_prices.index)
@@ -182,7 +199,7 @@ def main() -> None:
     result = run_backtest(
         stock_returns=stock_simple_returns,
         benchmark_returns=benchmark_simple_returns,
-        scores=composite_scores,
+        scores=alpha_scores,
         rebalance_dates=rebalance_dates,
         active_budget=active_budget,
         transaction_cost_bps=transaction_cost_bps,
@@ -205,6 +222,7 @@ def main() -> None:
         stock_prices=stock_prices,
     )
     _save_outputs(result=result, summary=summary, output_dir=PROCESSED_DATA_DIR)
+    alpha_scores.to_csv(ALPHA_SCORES_PATH)
     active_exposure_benchmark_weights = _active_exposure_benchmark_weights(
         benchmark_weight_method=benchmark_weight_method,
         benchmark_weights=benchmark_weights,
@@ -265,7 +283,7 @@ def main() -> None:
     cost_sensitivity = run_cost_sensitivity(
         stock_returns=stock_simple_returns,
         benchmark_returns=benchmark_simple_returns,
-        scores=composite_scores,
+        scores=alpha_scores,
         rebalance_dates=rebalance_dates,
         cost_bps_list=[0, 5, 10, 20],
         active_budget=active_budget,
@@ -286,7 +304,7 @@ def main() -> None:
     active_budget_sensitivity = run_active_budget_sensitivity(
         stock_returns=stock_simple_returns,
         benchmark_returns=benchmark_simple_returns,
-        scores=composite_scores,
+        scores=alpha_scores,
         rebalance_dates=rebalance_dates,
         active_budget_list=[0.10, 0.20, 0.30],
         transaction_cost_bps=transaction_cost_bps,
@@ -340,6 +358,42 @@ def main() -> None:
             float_format=lambda value: f"{value:.6f}",
         )
     )
+    alpha_model_sensitivity = run_alpha_model_sensitivity(
+        factor_scores=factor_scores,
+        stock_returns=stock_simple_returns,
+        benchmark_returns=benchmark_simple_returns,
+        rebalance_dates=rebalance_dates,
+        alpha_model_configs=[
+            {"model": "equal_weight_composite"},
+            {"model": "momentum_only"},
+            {
+                "model": "risk_adjusted_momentum",
+                "lowvol_penalty_weight": 0.25,
+            },
+            {
+                "model": "momentum_reversal",
+                "reversal_weight": 0.20,
+            },
+        ],
+        benchmark_weights=benchmark_weights,
+        transaction_cost_bps=transaction_cost_bps,
+        active_budget=active_budget,
+        max_active_weight=max_active_weight,
+        max_weight=max_weight,
+        max_turnover=max_turnover,
+        trade_lag_days=trade_lag_days,
+    )
+    _save_experiment_table(
+        alpha_model_sensitivity,
+        ALPHA_MODEL_SENSITIVITY_PATH,
+    )
+    print("\nAlpha Model Sensitivity")
+    print(
+        alpha_model_sensitivity.to_string(
+            index=False,
+            float_format=lambda value: f"{value:.6f}",
+        )
+    )
     subperiod_performance = run_subperiod_analysis(
         portfolio_returns=result.portfolio_returns_net,
         benchmark_returns=result.benchmark_returns,
@@ -355,7 +409,7 @@ def main() -> None:
     )
     ic_factor_scores = {
         **factor_scores,
-        "composite": composite_scores,
+        "composite": alpha_scores,
     }
     factor_ic_summary = run_factor_ic_analysis(
         factor_dict=ic_factor_scores,
@@ -462,6 +516,10 @@ def main() -> None:
         "Saved factor variant sensitivity table to "
         f"{FACTOR_VARIANT_SENSITIVITY_PATH}"
     )
+    print(
+        "Saved alpha model sensitivity table to "
+        f"{ALPHA_MODEL_SENSITIVITY_PATH}"
+    )
     print(f"Saved subperiod performance table to {SUBPERIOD_PERFORMANCE_PATH}")
     print(f"Saved factor IC summary table to {FACTOR_IC_SUMMARY_PATH}")
     print(f"Saved factor IC subperiod table to {FACTOR_IC_SUBPERIOD_PATH}")
@@ -474,6 +532,7 @@ def main() -> None:
         "Saved momentum backtest sensitivity table to "
         f"{MOMENTUM_BACKTEST_SENSITIVITY_PATH}"
     )
+    print(f"Saved alpha scores to {ALPHA_SCORES_PATH}")
     print(f"Saved active exposure diagnostics to {ACTIVE_EXPOSURE_DIAGNOSTICS_PATH}")
     print(f"Saved active exposure summary to {ACTIVE_EXPOSURE_SUMMARY_PATH}")
     print(f"Saved figures to {FIGURES_DIR}")
